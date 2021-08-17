@@ -1,3 +1,7 @@
+# Deep Learning Model for Image Stitching
+Credit: Implementation based on the [Image Super Resolution Repos](https://github.com/titu1994/Image-Super-Resolution)
+
+
 # Image Super Resolution using in Keras 2+
 
 Implementation of Image Super Resolution CNN in Keras from the paper 
