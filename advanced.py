@@ -9,6 +9,8 @@ from keras.engine.topology import Layer
 from keras import backend as K
 
 ''' Callbacks '''
+
+
 class HistoryCheckpoint(Callback):
     '''Callback that records events
         into a `History` object.
@@ -54,6 +56,8 @@ Below is a modification to the TensorBoard callback to perform
 batchwise writing to the tensorboard, instead of only at the end
 of the batch.
 '''
+
+
 class TensorBoardBatch(TensorBoard):
     def __init__(self, log_dir='./logs',
                  histogram_freq=0,
@@ -101,7 +105,7 @@ class TensorBoardBatch(TensorBoard):
                 continue
             summary = self.tf.Summary()
             summary_value = summary.value.add()
-            summary_value.simple_value = value.item()
+            summary_value.simple_value = value #.item()
             summary_value.tag = name
             self.writer.add_summary(summary, self.global_step)
 
@@ -111,45 +115,56 @@ class TensorBoardBatch(TensorBoard):
 
 ''' Theano Backend function '''
 
-def depth_to_scale(x, scale, output_shape, dim_ordering=K.image_dim_ordering(), name=None):
-    ''' Uses phase shift algorithm [1] to convert channels/depth for spacial resolution '''
-
-    import theano.tensor as T
-
-    scale = int(scale)
-
-    if dim_ordering == "tf":
-        x = x.transpose((0, 3, 1, 2))
-        out_row, out_col, out_channels = output_shape
-    else:
-        out_channels, out_row, out_col = output_shape
-
-    b, k, r, c = x.shape
-    out_b, out_k, out_r, out_c = b, k // (scale * scale), r * scale, c * scale
-
-    out = K.reshape(x, (out_b, out_k, out_r, out_c))
-
-    for channel in range(out_channels):
-        channel += 1
-
-        for i in range(out_row):
-            for j in range(out_col):
-                a = i // scale #T.floor(i / scale).astype('int32')
-                b = j // scale #T.floor(j / scale).astype('int32')
-                d = channel * scale * (j % scale) + channel * (i % scale)
-
-                T.set_subtensor(out[:, channel - 1, i, j], x[:, d, a, b], inplace=True)
-
-    if dim_ordering == 'tf':
-        out = out.transpose((0, 2, 3, 1))
-
-    return out
+#
+# def depth_to_scale(x, scale, output_shape, dim_ordering=K.image_dim_ordering(), name=None):
+#     ''' Uses phase shift algorithm [1] to convert channels/depth for spacial resolution '''
+#
+#     try:
+#         import theano.tensor as T
+#     except ImportError:
+#         print("Could not import Tensorflow for depth_to_scale operation. Please install Theano backend")
+#         exit()
+#
+#     scale = int(scale)
+#
+#     if dim_ordering == "tf":
+#         x = x.transpose((0, 3, 1, 2))
+#         out_row, out_col, out_channels = output_shape
+#     else:
+#         out_channels, out_row, out_col = output_shape
+#
+#     b, k, r, c = x.shape
+#     out_b, out_k, out_r, out_c = b, k // (scale * scale), r * scale, c * scale
+#
+#     out = K.reshape(x, (out_b, out_k, out_r, out_c))
+#
+#     for channel in range(out_channels):
+#         channel += 1
+#
+#         for patchIdx in range(out_row):
+#             for j in range(out_col):
+#                 a = patchIdx // scale  # T.floor(patchIdx / scale).astype('int32')
+#                 b = j // scale  # T.floor(j / scale).astype('int32')
+#                 d = channel * scale * (j % scale) + channel * (patchIdx % scale)
+#
+#                 T.set_subtensor(out[:, channel - 1, patchIdx, j], x[:, d, a, b], inplace=True)
+#
+#     if dim_ordering == 'tf':
+#         out = out.transpose((0, 2, 3, 1))
+#
+#     return out
 
 
 ''' Theano Backend function '''
+
+
 def depth_to_scale_th(input, scale, channels):
     ''' Uses phase shift algorithm [1] to convert channels/depth for spacial resolution '''
-    import theano.tensor as T
+    try:
+        import theano.tensor as T
+    except ImportError:
+        print("Could not import Tensorflow for depth_to_scale operation. Please install Theano backend")
+        exit()
 
     b, k, row, col = input.shape
     output_shape = (b, channels, row * scale, col * scale)
@@ -158,17 +173,21 @@ def depth_to_scale_th(input, scale, channels):
     r = scale
 
     for y, x in itertools.product(range(scale), repeat=2):
-        out = T.inc_subtensor(out[:, :, y::r, x::r], input[:, r * y + x :: r * r, :, :])
+        out = T.inc_subtensor(out[:, :, y::r, x::r], input[:, r * y + x:: r * r, :, :])
 
     return out
 
 
 ''' Tensorflow Backend Function '''
+
+
 def depth_to_scale_tf(input, scale, channels):
     try:
         import tensorflow as tf
     except ImportError:
-        print("Could not import Tensorflow for depth_to_scale operation. Please install Tensorflow or switch to Theano backend")
+        print(
+            "Could not import Tensorflow for depth_to_scale operation. Please install Tensorflow or switch to Theano "
+            "backend")
         exit()
 
     def _phase_shift(I, r):
@@ -191,9 +210,11 @@ def depth_to_scale_tf(input, scale, channels):
         X = _phase_shift(input, scale)
     return X
 
+
 '''
 Implementation is incomplete. Use lambda layer for now.
 '''
+
 
 class SubPixelUpscaling(Layer):
 
@@ -216,13 +237,14 @@ class SubPixelUpscaling(Layer):
     def get_output_shape_for(self, input_shape):
         if K.image_dim_ordering() == "th":
             b, k, r, c = input_shape
-            return (b, self.channels, r * self.r, c * self.r)
+            return b, self.channels, r * self.r, c * self.r
         else:
             b, r, c, k = input_shape
-            return (b, r * self.r, c * self.r, self.channels)
+            return b, r * self.r, c * self.r, self.channels
 
 
 ''' Non Local Blocks '''
+
 
 def non_local_block(ip, computation_compression=2, mode='embedded'):
     channel_dim = 1 if K.image_data_format() == 'channels_first' else -1
@@ -275,10 +297,9 @@ def non_local_block(ip, computation_compression=2, mode='embedded'):
 
         # scale the values to make it size invariant
         if batchsize is not None:
-            f = Lambda(lambda z: 1./ batchsize * z)(f)
+            f = Lambda(lambda z: 1. / batchsize * z)(f)
         else:
             f = Lambda(lambda z: 1. / 128 * z)(f)
-
 
     elif mode == 'concatenate':  # Concatenation instantiation
         raise NotImplemented('Concatenation mode has not been implemented yet')

@@ -2,6 +2,7 @@ from __future__ import print_function, division
 
 from keras.utils.vis_utils import plot_model
 import models
+import model_stitching
 import img_utils
 
 if __name__ == "__main__":
@@ -38,16 +39,27 @@ if __name__ == "__main__":
     # model = models.NonLocalResNetSR(scale).create_model()
     # plot_model(model, to_file='architectures/non_local_resnet_sr.png', show_layer_names=True, show_shapes=True)
 
+    # model = model_stitching.NonLocalResNetSR().create_model()
+    # plot_model(model, to_file="architectures/SRCNN_stitch.png", show_shapes=True, show_layer_names=True)
+
     """
-    Train Super Resolution
+    Train Super Resolution => Did work
     """
 
     # sr = models.ImageSuperResolutionModel(scale)
-    # sr.create_model()
+    # sr.create_model(height=64, width=64)
     # sr.fit(nb_epochs=250)
 
     """
-    Train ExpantionSuperResolution
+    Train image stitching model
+    """
+
+    sr = model_stitching.NonLocalResNetStitching()
+    sr.create_model(height=128, width=128)
+    sr.fit(nb_epochs=250, batch_size=32)
+
+    """
+    Train ExpantionSuperResolution => Did not work
     """
 
     # esr = models.ExpantionSuperResolution(scale)
@@ -55,7 +67,7 @@ if __name__ == "__main__":
     # esr.fit(nb_epochs=250)
 
     """
-    Train DenoisingAutoEncoderSR
+    Train DenoisingAutoEncoderSR => Did not work
     """
 
     # dsr = models.DenoisingAutoEncoderSR(scale)
@@ -63,7 +75,7 @@ if __name__ == "__main__":
     # dsr.fit(nb_epochs=250)
 
     """
-    Train Deep Denoise SR
+    Train Deep Denoise SR => Did not work
     """
 
     # ddsr = models.DeepDenoiseSR(scale)
@@ -71,7 +83,7 @@ if __name__ == "__main__":
     # ddsr.fit(nb_epochs=180)
 
     """
-    Train Res Net SR
+    Train Res Net SR => Did work
     """
 
     # rnsr = models.ResNetSR(scale)
@@ -79,7 +91,7 @@ if __name__ == "__main__":
     # rnsr.fit(nb_epochs=50)
 
     """
-    Train ESPCNN SR
+    Train ESPCNN SR => Did not work
     """
 
     # espcnn = models.EfficientSubPixelConvolutionalSR(scale)
@@ -87,7 +99,7 @@ if __name__ == "__main__":
     # espcnn.fit(nb_epochs=50)
 
     """
-    Train GAN Super Resolution
+    Train GAN Super Resolution => Did not work
     """
 
     # gsr = models.GANImageSuperResolutionModel(scale)
@@ -95,7 +107,7 @@ if __name__ == "__main__":
     # gsr.fit(nb_pretrain_samples=10000, nb_epochs=10)
 
     """
-    Train Non Local ResNets
+    Train Non Local ResNets => Did work
     """
 
     # non_local_rnsr = models.NonLocalResNetSR(scale)

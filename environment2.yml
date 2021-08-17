@@ -1,0 +1,13 @@
+name: tensorflow_envs
+channels:
+  - defaults
+dependencies:
+  - tensorflow=1.15
+  - keras==2.3.1
+  - imageio
+  - scipy
+  - opencv
+  - scikit-learn
+  - pydot
+  - python-graphviz
+prefix: /home/erman/anaconda3/envs/tensorflow_envs

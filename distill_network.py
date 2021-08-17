@@ -25,8 +25,10 @@ student_model = models.DistilledResNetSR(scale_factor)
 student_model.create_model()
 student_model.model.summary()
 
+
 def zero_loss(y_true, y_pred):
     return 0 * y_true
+
 
 def gram_matrix(x):
     assert K.ndim(x) == 4
@@ -41,6 +43,7 @@ def gram_matrix(x):
 
         gram = K.dot(features, K.transpose(features)) / (channels * width * height)
     return gram
+
 
 joint_model = Model(inputs=[student_model.model.input, teacher_model.model.input],
                     outputs=student_model.model.output)
@@ -84,13 +87,13 @@ joint_model.fit_generator(img_utils.image_generator(train_path, scale_factor=sca
                                                     small_train_images=teacher_model.type_true_upscaling,
                                                     batch_size=batchsize,
                                                     nb_inputs=2),  # 2 input joint model
-                         steps_per_epoch=samples_per_epoch // batchsize + 1,
-                         epochs=nb_epochs, callbacks=callback_list,
-                         validation_data=img_utils.image_generator(validation_path,
-                                                                   scale_factor=scale_factor,
-                                                                   small_train_images=teacher_model.type_true_upscaling,
-                                                                   batch_size=val_count,
-                                                                   nb_inputs=2),  # 2 input joint model
-                         validation_steps=1)
+                          steps_per_epoch=samples_per_epoch // batchsize + 1,
+                          epochs=nb_epochs, callbacks=callback_list,
+                          validation_data=img_utils.image_generator(validation_path,
+                                                                    scale_factor=scale_factor,
+                                                                    small_train_images=teacher_model.type_true_upscaling,
+                                                                    batch_size=val_count,
+                                                                    nb_inputs=2),  # 2 input joint model
+                          validation_steps=1)
 
 student_model.model.save_weights('weights/student_model_final %dX.h5' % scale_factor, overwrite=True)
