@@ -109,10 +109,10 @@ class BaseSuperStitchingModel(object):
         # Generators
         training_generator = image_stitching_generator(train_indexes, config_data,
                                                        callee="training_generator", **params)
-        validation_generator = image_stitching_generator(train_indexes, config_data,
+        validation_generator = image_stitching_generator(test_indexes, config_data,
                                                          callee="validation_generator", **params)
         # training_generator = DataGenerator(train_indexes, config_data, callee="training_generator", **params)
-        # validation_generator = DataGenerator(train_indexes, config_data, callee="validation_generator", **params)
+        # validation_generator = DataGenerator(test_indexes, config_data, callee="validation_generator", **params)
 
         if save_history:
             callback_list.append(HistoryCheckpoint(history_fn))
@@ -384,3 +384,44 @@ class NonLocalResNetStitching(BaseSuperStitchingModel):
 
     def fit(self, batch_size=128, nb_epochs=100, save_history=True, history_fn="Non Local ResNetSR History.txt"):
         super(NonLocalResNetStitching, self).fit(batch_size, nb_epochs, save_history, history_fn)
+
+
+class ImageStitchingModel(BaseSuperStitchingModel):
+
+    def __init__(self):
+        super(ImageStitchingModel, self).__init__("Image Stitching Model")
+
+        self.f1 = 9
+        self.f2 = 1
+        self.f3 = 5
+
+        self.n1 = 64
+        self.n2 = 32
+
+        self.weight_path = "weights/Stitching Weights.h5"
+        # self.type_true_upscaling = True
+
+    def create_model(self, height=32, width=32, channels=3, nb_camera=5, load_weights=False):
+        """
+            Creates a model to be used to scale images of specific height and width.
+        """
+        init = super(ImageStitchingModel, self).create_model(height, width, channels, nb_camera, load_weights)
+
+        x = Convolution2D(self.n1, (self.f1, self.f1), activation='relu', padding='same', name='level1')(init)
+        x = Convolution2D(self.n2, (self.f2, self.f2), activation='relu', padding='same', name='level2')(x)
+
+        out = Convolution2D(channels, (self.f3, self.f3), padding='same', name='output')(x)
+
+        model = Model(init, out)
+
+        adam = optimizers.Adam(lr=1e-3)
+        model.compile(optimizer=adam, loss='mse', metrics=[PSNRLoss])
+        if load_weights:
+            model.load_weights(self.weight_path)
+        model.summary()
+
+        self.model = model
+        return model
+
+    def fit(self, batch_size=128, nb_epochs=100, save_history=True, history_fn="SRCNN History.txt"):
+        return super(ImageStitchingModel, self).fit(batch_size, nb_epochs, save_history, history_fn)
