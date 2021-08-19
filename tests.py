@@ -54,9 +54,9 @@ if __name__ == "__main__":
     Train Stitching Model CNN
     """
 
-    sr = model_stitching.ImageStitchingModel()
-    sr.create_model(height=128, width=128)
-    sr.fit(nb_epochs=250, batch_size=32)
+    # sr = model_stitching.ImageStitchingModel()
+    # sr.create_model(height=128, width=128)
+    # sr.fit(nb_epochs=250, batch_size=32)
 
     """
     Train image stitching model Resnet
@@ -123,6 +123,13 @@ if __name__ == "__main__":
     # non_local_rnsr.fit(nb_epochs=50)
 
     """
+    Evaluate Image Stitching
+    """
+
+    sr = model_stitching.ImageStitchingModel()
+    sr.stitch("/media/sf_Data/data_stitching/deepstitch-dataset/images/2/tk_0.png")
+
+    """
     Evaluate Super Resolution on Set5/14
     """
 
@@ -133,8 +140,8 @@ if __name__ == "__main__":
     Evaluate ESRCNN on Set5/14
     """
 
-    #esr = models.ExpantionSuperResolution(scale)
-    #esr.evaluate(val_path)
+    # esr = models.ExpantionSuperResolution(scale)
+    # esr.evaluate(val_path)
 
     """
     Evaluate DSRCNN on Set5/14 cannot be performed at the moment.
@@ -142,15 +149,15 @@ if __name__ == "__main__":
     This causes the model to fail to predict different images of different image sizes.
     """
 
-    #dsr = models.DenoisingAutoEncoderSR(scale)
-    #dsr.evaluate(val_path)
+    # dsr = models.DenoisingAutoEncoderSR(scale)
+    # dsr.evaluate(val_path)
 
     """
     Evaluate DDSRCNN on Set5/14
     """
 
-    #ddsr = models.DeepDenoiseSR(scale)
-    #ddsr.evaluate(val_path)
+    # ddsr = models.DeepDenoiseSR(scale)
+    # ddsr.evaluate(val_path)
 
     """
     Evaluate ResNetSR on Set5/14
@@ -193,14 +200,14 @@ if __name__ == "__main__":
     Compare output images of sr, esr, dsr and ddsr models
     """
 
-    #sr = models.ImageSuperResolutionModel(scale)
-    #sr.upscale(path, save_intermediate=False, suffix="sr")
+    # sr = models.ImageSuperResolutionModel(scale)
+    # sr.upscale(path, save_intermediate=False, suffix="sr")
 
-    #esr = models.ExpantionSuperResolution(scale)
-    #esr.upscale(path, save_intermediate=False, suffix="esr")
+    # esr = models.ExpantionSuperResolution(scale)
+    # esr.upscale(path, save_intermediate=False, suffix="esr")
 
-    #dsr = models.DenoisingAutoEncoderSR(scale)
-    #dsr.upscale(path, save_intermediate=False, suffix="dsr")
+    # dsr = models.DenoisingAutoEncoderSR(scale)
+    # dsr.upscale(path, save_intermediate=False, suffix="dsr")
 
     # ddsr = models.DeepDenoiseSR(scale)
     # ddsr.upscale(path, save_intermediate=False, suffix="ddsr")
@@ -209,7 +216,5 @@ if __name__ == "__main__":
     # rnsr.create_model(None, None, 3, load_weights=True)
     # rnsr.upscale(path, save_intermediate=False, suffix="rnsr")
 
-    #gansr = models.GANImageSuperResolutionModel(scale)
-    #gansr.upscale(path, save_intermediate=False, suffix='gansr')
-
-
+    # gansr = models.GANImageSuperResolutionModel(scale)
+    # gansr.upscale(path, save_intermediate=False, suffix='gansr')

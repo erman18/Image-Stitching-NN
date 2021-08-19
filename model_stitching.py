@@ -16,6 +16,7 @@ from sklearn.model_selection import train_test_split
 
 import numpy as np
 import os
+import glob
 import time
 import warnings
 
@@ -158,156 +159,130 @@ class BaseSuperStitchingModel(object):
     def evaluate(self, validation_dir):
         pass
 
-    # def stitch(self, img_path, save_intermediate=False, return_image=False, suffix="scaled",
-    #            patch_size=8, mode="patch", verbose=True):
-    #     """
-    #     Standard method to upscale an image.
-    #     :param img_path:  path to the image
-    #     :param save_intermediate: saves the intermediate upscaled image (bilinear upscale)
-    #     :param return_image: returns a image of shape (height, width, channels).
-    #     :param suffix: suffix of upscaled image
-    #     :param patch_size: size of each patch grid
-    #     :param verbose: whether to print messages
-    #     :param mode: mode of upscaling. Can be "patch" or "fast"
-    #     """
-    #     import os
-    #     # try:
-    #     #     from scipy.misc import imread, imresize, imsave
-    #     # except:
-    #     #     pass
-    #     from imageio import imread, imwrite
-    #     from cv2 import resize
-    #
-    #     # Destination path
-    #     path = os.path.splitext(img_path)
-    #     filename = path[0] + "_" + suffix + "(%dx)" % (self.scale_factor) + path[1]
-    #
-    #     # Read image
-    #     scale_factor = int(self.scale_factor)
-    #     true_img = imread(img_path, pilmode='RGB')
-    #     init_dim_1, init_dim_2 = true_img.shape[0], true_img.shape[1]
-    #     if verbose: print("Old Size : ", true_img.shape)
-    #     if verbose: print("New Size : (%d, %d, 3)" % (init_dim_1 * scale_factor, init_dim_2 * scale_factor))
-    #
-    #     img_dim_1, img_dim_2 = 0, 0
-    #
-    #     if mode == "patch" and self.type_true_upscaling:
-    #         # Overriding mode for True Upscaling models
-    #         mode = 'fast'
-    #         print("Patch mode does not work with True Upscaling models yet. Defaulting to mode='fast'")
-    #
-    #     if mode == 'patch':
-    #         # Create patches
-    #         if self.type_requires_divisible_shape:
-    #             if patch_size % 4 != 0:
-    #                 print("Deep Denoise requires patch size which is multiple of 4.\nSetting patch_size = 8.")
-    #                 patch_size = 8
-    #
-    #         images = img_utils.make_patches(true_img, scale_factor, patch_size, verbose=verbose)
-    #
-    #         nb_images = images.shape[0]
-    #         img_dim_1, img_dim_2 = images.shape[1], images.shape[2]
-    #         print("Number of patches = %d, Patch Shape = (%d, %d)" % (nb_images, img_dim_2, img_dim_1))
-    #     else:
-    #         # Use full image for super resolution
-    #         img_dim_1, img_dim_2 = self.__match_autoencoder_size(img_dim_1, img_dim_2, init_dim_1, init_dim_2,
-    #                                                              scale_factor)
-    #
-    #         images = resize(true_img, (img_dim_1, img_dim_2))
-    #         images = np.expand_dims(images, axis=0)
-    #         print("Image is reshaped to : (%d, %d, %d)" % (images.shape[1], images.shape[2], images.shape[3]))
-    #
-    #     # Save intermediate bilinear scaled image is needed for comparison.
-    #     intermediate_img = None
-    #     if save_intermediate:
-    #         if verbose: print("Saving intermediate image.")
-    #         fn = path[0] + "_intermediate_" + path[1]
-    #         intermediate_img = resize(true_img, (init_dim_1 * scale_factor, init_dim_2 * scale_factor))
-    #         imwrite(fn, intermediate_img)
-    #
-    #     print("Images shape: ", images.shape)
-    #     # Transpose and Process images
-    #     # if K.image_dim_ordering() == "th":
-    #     #     img_conv = images.transpose((0, 3, 1, 2)).astype(np.float32) / 255.
-    #     # else:
-    #     #     img_conv = images.astype(np.float32) / 255.
-    #     img_conv = images.transpose((0, 2, 1, 3)).astype(np.float32) / 255.
-    #
-    #     model = self.create_model(img_dim_2, img_dim_1, load_weights=True)
-    #     if verbose: print("Model loaded.")
-    #
-    #     # Create prediction for image patches
-    #     result = model.predict(img_conv, batch_size=128, verbose=verbose)
-    #
-    #     if verbose: print("De-processing images.")
-    #
-    #     # Deprocess patches
-    #     # if K.image_dim_ordering() == "th":
-    #     #     result = result.transpose((0, 2, 3, 1)).astype(np.float32) * 255.
-    #     # else:
-    #     #     result = result.astype(np.float32) * 255.
-    #     result = result.transpose((0, 2, 1, 3)).astype(np.float32) * 255.
-    #
-    #     # Output shape is (original_width * scale, original_height * scale, nb_channels)
-    #     if mode == 'patch':
-    #         out_shape = (init_dim_1 * scale_factor, init_dim_2 * scale_factor, 3)
-    #         result = img_utils.combine_patches(result, out_shape, scale_factor)
-    #     else:
-    #         result = result[0, :, :, :]  # Access the 3 Dimensional image vector
-    #
-    #     result = np.clip(result, 0, 255).astype('uint8')
-    #
-    #     if _cv2_available:
-    #         # used to remove noisy edges
-    #         result = cv2.pyrUp(result)
-    #         result = cv2.medianBlur(result, 3)
-    #         result = cv2.pyrDown(result)
-    #
-    #     if verbose: print("\nCompleted De-processing image.")
-    #
-    #     if return_image:
-    #         # Return the image without saving. Useful for testing images.
-    #         return result
-    #
-    #     if verbose: print("Saving image.", filename)
-    #     imwrite(filename, result)
-    #
-    # def __match_autoencoder_size(self, img_dim_1, img_dim_2, init_dim_1, init_dim_2, scale_factor):
-    #     if self.type_requires_divisible_shape:
-    #         if not self.type_true_upscaling:
-    #             # AE model but not true upsampling
-    #             if ((init_dim_2 * scale_factor) % 4 != 0) or ((init_dim_1 * scale_factor) % 4 != 0) or \
-    #                     (init_dim_2 % 2 != 0) or (init_dim_1 % 2 != 0):
-    #
-    #                 print("AE models requires image size which is multiple of 4.")
-    #                 img_dim_2 = ((init_dim_2 * scale_factor) // 4) * 4
-    #                 img_dim_1 = ((init_dim_1 * scale_factor) // 4) * 4
-    #
-    #             else:
-    #                 # No change required
-    #                 img_dim_2, img_dim_1 = init_dim_2 * scale_factor, init_dim_1 * scale_factor
-    #         else:
-    #             # AE model and true upsampling
-    #             if (init_dim_2 % 4 != 0) or (init_dim_1 % 4 != 0) or \
-    #                     (init_dim_2 % 2 != 0) or (init_dim_1 % 2 != 0):
-    #
-    #                 print("AE models requires image size which is multiple of 4.")
-    #                 img_dim_2 = (init_dim_2 // 4) * 4
-    #                 img_dim_1 = (init_dim_1 // 4) * 4
-    #
-    #             else:
-    #                 # No change required
-    #                 img_dim_2, img_dim_1 = init_dim_2, init_dim_1
-    #     else:
-    #         # Not AE but true upsampling
-    #         if self.type_true_upscaling:
-    #             img_dim_2, img_dim_1 = init_dim_2, init_dim_1
-    #         else:
-    #             # Not AE and not true upsampling
-    #             img_dim_2, img_dim_1 = init_dim_2 * scale_factor, init_dim_1 * scale_factor
-    #
-    #     return img_dim_1, img_dim_2,
-    #
+    def stitch(self, img_path, save_intermediate=False, return_image=False, suffix="stitch",
+               patch_size=8, mode="patch", verbose=True):
+        """
+        Standard method to upscale an image.
+        :param img_path:  path to the image
+        :param save_intermediate: saves the intermediate upscaled image (bilinear upscale)
+        :param return_image: returns a image of shape (height, width, channels).
+        :param suffix: suffix of upscaled image
+        :param patch_size: size of each patch grid
+        :param verbose: whether to print messages
+        :param mode: mode of upscaling. Can be "patch" or "fast"
+        """
+
+        # Destination path
+        path = os.path.splitext(img_path)
+        filename = path[0] + "_" + suffix + "stitch" + path[1]
+
+        # Read image
+        # true_img = imread(img_path)
+        # h, w = true_img.shape[0], true_img.shape[1]
+        # if verbose: print("Old Size : ", true_img.shape)
+        #
+        # img_dim_1, img_dim_2 = 0, 0
+        #
+        # if mode == "patch" and self.type_true_upscaling:
+        #     # Overriding mode for True Upscaling models
+        #     mode = 'fast'
+        #     print("Patch mode does not work with True Upscaling models yet. Defaulting to mode='fast'")
+        #
+        # if mode == 'patch':
+        #     # Create patches
+        #     if self.type_requires_divisible_shape:
+        #         if patch_size % 4 != 0:
+        #             print("Deep Denoise requires patch size which is multiple of 4.\nSetting patch_size = 8.")
+        #             patch_size = 8
+        #
+        #     images = img_utils.make_patches(true_img, scale_factor, patch_size, verbose=verbose)
+        #
+        #     nb_images = images.shape[0]
+        #     img_dim_1, img_dim_2 = images.shape[1], images.shape[2]
+        #     print("Number of patches = %d, Patch Shape = (%d, %d)" % (nb_images, img_dim_2, img_dim_1))
+        # else:
+        #     # Use full image for super resolution
+        #     img_dim_1, img_dim_2 = self.__match_autoencoder_size(img_dim_1, img_dim_2, init_dim_1, init_dim_2,
+        #                                                          scale_factor)
+        #
+        #     images = resize(true_img, (img_dim_1, img_dim_2))
+        #     images = np.expand_dims(images, axis=0)
+        #     print("Image is reshaped to : (%d, %d, %d)" % (images.shape[1], images.shape[2], images.shape[3]))
+        #
+        # # Save intermediate bilinear scaled image is needed for comparison.
+        # intermediate_img = None
+        # if save_intermediate:
+        #     if verbose: print("Saving intermediate image.")
+        #     fn = path[0] + "_intermediate_" + path[1]
+        #     intermediate_img = resize(true_img, (init_dim_1 * scale_factor, init_dim_2 * scale_factor))
+        #     imwrite(fn, intermediate_img)
+
+        # print("Images shape: ", images.shape)
+        # # Transpose and Process images
+        # # if K.image_dim_ordering() == "th":
+        # #     img_conv = images.transpose((0, 3, 1, 2)).astype(np.float32) / 255.
+        # # else:
+        # #     img_conv = images.astype(np.float32) / 255.
+        # img_conv = images.transpose((0, 2, 1, 3)).astype(np.float32) / 255.
+
+        img_conv, h, w = self.__read_conv_img(img_path)
+        img_conv = img_conv.transpose((0, 2, 1, 3)).astype(np.float32) / 255.
+
+        model = self.create_model(h, w, load_weights=True)
+        if verbose: print("Model loaded.")
+
+        # Create prediction for image patches
+        result = model.predict(img_conv, batch_size=128, verbose=verbose)
+
+        if verbose: print("De-processing images.")
+
+        # Deprocess patches
+        # if K.image_dim_ordering() == "th":
+        #     result = result.transpose((0, 2, 3, 1)).astype(np.float32) * 255.
+        # else:
+        #     result = result.astype(np.float32) * 255.
+        result = result.transpose((0, 2, 1, 3)).astype(np.float32) * 255.
+
+        result = result[0, :, :, :]  # Access the 3 Dimensional image vector
+
+        result = np.clip(result, 0, 255).astype('uint8')
+
+        if _cv2_available:
+            # used to remove noisy edges
+            result = cv2.pyrUp(result)
+            result = cv2.medianBlur(result, 3)
+            result = cv2.pyrDown(result)
+
+        if verbose: print("\nCompleted De-processing image.")
+
+        if return_image:
+            # Return the image without saving. Useful for testing images.
+            return result
+
+        if verbose: print("Saving image.", filename)
+        cv2.imwrite(filename, result)
+
+    def __read_conv_img(self, img_path):
+
+        img_dir = os.path.dirname(img_path)
+        files = []
+        exts = ["*.jpg", "*.jpeg", "*.png", "*.bmp", "*.gif"]
+        for ext in exts:
+            files.extend(glob.glob(os.path.join(img_dir, ext)))
+
+        true_img = cv2.imread(img_path)
+        h, w = true_img.shape[0], true_img.shape[1]
+
+        X = np.zeros((1, h, w, 15))
+
+        for img_idx, img_path in enumerate(files):
+            img = cv2.imread(img_path)  # pilmode='RGB'
+            img[np.where((img == [255, 255, 255]).all(axis=2))] = [0, 0, 0]
+            j = 3 * img_idx
+
+            X[0, :, :, j:(j + 3)] = img
+
+        return X, h, w
 
 
 class NonLocalResNetStitching(BaseSuperStitchingModel):
