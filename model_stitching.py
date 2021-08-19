@@ -228,11 +228,14 @@ class BaseSuperStitchingModel(object):
         img_conv, h, w = self.__read_conv_img(img_path)
         img_conv = img_conv.transpose((0, 2, 1, 3)).astype(np.float32) / 255.
 
+        print("Convolution image data point ready to be used: ", img_conv.shape)
+
         model = self.create_model(h, w, load_weights=True)
         if verbose: print("Model loaded.")
 
         # Create prediction for image patches
-        result = model.predict(img_conv, batch_size=128, verbose=verbose)
+        print("Starting the image stitching prediction")
+        result = model.predict(img_conv, verbose=verbose)
 
         if verbose: print("De-processing images.")
 
