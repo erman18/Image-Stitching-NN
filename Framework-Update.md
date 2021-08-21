@@ -1,5 +1,16 @@
 # Super Resolution Framework
 
+Command to export conda environment files
+
+The first environment is not cross-platform compatible:
+
+`conda env export --no-builds | grep -v "^prefix: " > environment.yml`
+
+Create a cross-platform compatible environment file, but it does not contain pip files which I added after copying 
+from the previous generate files. 
+
+`conda env export --from-history --no-builds | grep -v "^prefix: " > environment2.yml`
+
 This project contains 3 main modules which have been almost completely reworked:
 - img_utils : Contains training data set generation, validation data set generation and general image manipulation.
 - advanced : Contains custom Keras regularizers and callbacks that are used 

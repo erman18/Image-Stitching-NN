@@ -10,4 +10,5 @@ dependencies:
   - scikit-learn
   - pydot
   - python-graphviz
-prefix: /home/erman/anaconda3/envs/tensorflow_envs
+  - pip:
+    - patchify==0.2.3

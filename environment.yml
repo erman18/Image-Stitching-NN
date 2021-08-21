@@ -117,4 +117,3 @@ dependencies:
   - zstd=1.5.0
   - pip:
     - patchify==0.2.3
-prefix: /home/erman/anaconda3/envs/tensorflow_envs
