@@ -14,5 +14,6 @@ dependencies:
   - scikit-learn
   - pydot
   - python-graphviz
+  - pip
   - pip:
     - patchify==0.2.3
