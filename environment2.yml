@@ -1,12 +1,16 @@
-name: tensorflow_envs
+name: tensorflow_envs2
 channels:
+  - conda-forge
   - defaults
 dependencies:
-  - tensorflow=1.15
-  - keras==2.3.1
-  - imageio
+  - tensorflow=2.5.0
+  - tensorboard=2.5.0
+  - keras=2.4.3
+  - imageio=2.9.0
   - scipy
+  - libopencv
   - opencv
+  - py-opencv
   - scikit-learn
   - pydot
   - python-graphviz

@@ -295,10 +295,13 @@ def load_data_sample(img_paths, dim, n_channels, tain_folder):
 
     scene_id, patchx_id, patchy_id, total_imgs = img_paths
 
-    X = np.zeros((*dim, n_channels))
+    X = np.zeros((*dim, n_channels), dtype=np.float32)
     for img_idx in range(total_imgs):
-        img_path = tain_folder + "/X/camID%d/imgID%d/patchID_%d_%d.png" \
-                   % (scene_id, img_idx, patchx_id, patchy_id)
+        # img_path = tain_folder + "/X/camID%d/imgID%d/patchID_%d_%d.png" \
+        #            % (scene_id, img_idx, patchx_id, patchy_id)
+        # img_path="{}/X/camID{}/imgID{}/patchID_{}_{}.png".format(tain_folder, scene_id, img_idx, patchx_id, patchy_id)
+        img_path = f'{tain_folder.decode("utf-8")}/X/camID{scene_id}/imgID{img_idx}/patchID_{patchx_id}_{patchy_id}.png'
+        # print(img_path)
 
         img = cv2.imread(img_path, cv2.IMREAD_COLOR)
         img = img.astype('float32') / 255.
@@ -306,7 +309,9 @@ def load_data_sample(img_paths, dim, n_channels, tain_folder):
         j = 3 * img_idx
         X[:, :, j:(j + 3)] = img
 
-    img_target_path = tain_folder + "/Y/camID%d/patchID_%d_%d.png" % (scene_id, patchx_id, patchy_id)
+    # img_target_path = tain_folder + "/Y/camID%d/patchID_%d_%d.png" % (scene_id, patchx_id, patchy_id)
+    # img_target_path = "{}/Y/camID{}/patchID_{}_{}.png".format(tain_folder, scene_id, patchx_id, patchy_id)
+    img_target_path = f'{tain_folder.decode("utf-8")}/Y/camID{scene_id}/patchID_{patchx_id}_{patchy_id}.png'
 
     target_img = cv2.imread(img_target_path, cv2.IMREAD_COLOR)
     y = target_img.astype('float32') / 255.
@@ -337,10 +342,10 @@ def read_img_dataset(list_ids, config_data, callee, batch_size=32, dim=(256, 256
     dataset = tf.data.Dataset.from_tensor_slices(list_paths)
     # dataset = dataset.map(load_image)
 
-    dataset = dataset.map(lambda x: load_image(x, dim, n_channels, psd.training_folder))
+    # dataset = dataset.map(lambda x: load_image(x, dim, n_channels, psd.training_folder))
 
-    # dataset = dataset.map(lambda item1, item2=dim, item3=n_channels, item4=psd.training_folder: tf.numpy_function(
-    #     load_data_sample, [item1, item2, item3, item4], [tf.float32, tf.float32]))  #
+    dataset = dataset.map(lambda item1, item2=dim, item3=n_channels, item4=str(psd.training_folder): tf.numpy_function(
+        load_data_sample, [item1, item2, item3, item4], [tf.float32, tf.float32]))  #
 
     return dataset.repeat(1).batch(batch_size=batch_size).prefetch(buffer_size)
 

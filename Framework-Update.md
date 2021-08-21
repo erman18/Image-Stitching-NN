@@ -11,6 +11,35 @@ from the previous generate files.
 
 `conda env export --from-history --no-builds | grep -v "^prefix: " > environment2.yml`
 
+Install packages
+
+`conda env create -f environment2.yml`
+
+Installation of OpenCV
+
+```
+conda config --add channels conda-forge
+conda install libopencv opencv py-opencv
+```
+
+All command to manually install the environment `tensorflow_envs2`
+```angular2html
+conda create --name tensorflow_envs2
+conda activate tensorflow_envs2
+
+conda install tensorflow=2.5.0
+conda install tensorboard=2.5.0
+conda install keras=2.4.3
+pip install patchify
+conda install imageio
+conda config --add channels conda-forge
+conda install libopencv opencv py-opencv
+conda install scipy
+conda install scikit-learn
+conda install pydot
+conda install python-graphviz
+```
+
 This project contains 3 main modules which have been almost completely reworked:
 - img_utils : Contains training data set generation, validation data set generation and general image manipulation.
 - advanced : Contains custom Keras regularizers and callbacks that are used 

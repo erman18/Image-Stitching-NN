@@ -46,6 +46,7 @@ def PSNRLoss(y_true, y_pred):
     Thus we remove that component completely and only compute the remaining MSE component.
     """
     return -10. * K.log(K.mean(K.square(y_pred - y_true))) / K.log(10.)
+    # return K.cast(-10. * K.log(K.mean(K.square(y_pred - y_true))) / K.log(10.), dtype='float32')
 
 
 def psnr(y_true, y_pred):
@@ -356,7 +357,7 @@ class NonLocalResNetStitching(BaseSuperStitchingModel):
 
         model = Model(init, x)
 
-        adam = optimizers.Adam(lr=1e-3)
+        adam = optimizers.Adam(learning_rate=1e-3)
         model.compile(optimizer=adam, loss='mse', metrics=[PSNRLoss])
         if load_weights: model.load_weights(self.weight_path, by_name=True)
 
@@ -423,7 +424,7 @@ class ImageStitchingModel(BaseSuperStitchingModel):
 
         model = Model(init, out)
 
-        adam = optimizers.Adam(lr=1e-3)
+        adam = optimizers.Adam(learning_rate=1e-3)
         model.compile(optimizer=adam, loss='mse', metrics=[PSNRLoss])
         if load_weights:
             model.load_weights(self.weight_path)

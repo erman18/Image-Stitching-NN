@@ -81,6 +81,7 @@ class TensorBoardBatch(TensorBoard):
         # conditionally import tensorflow iff TensorBoardBatch is created
         self.tf = __import__('tensorflow')
         self.global_step = 1
+        self.writer = self.tf.summary.create_file_writer(log_dir)
 
     def on_batch_end(self, batch, logs=None):
         logs = logs or {}
@@ -88,11 +89,15 @@ class TensorBoardBatch(TensorBoard):
         for name, value in logs.items():
             if name in ['batch', 'size']:
                 continue
-            summary = self.tf.Summary()
-            summary_value = summary.value.add()
-            summary_value.simple_value = value.item()
-            summary_value.tag = name
-            self.writer.add_summary(summary, self.global_step)
+            # summary = self.tf.summary()
+            # summary_value = summary.value.add()
+            # summary_value.simple_value = value.item()
+            # summary_value.tag = name
+            # self.writer.add_summary(summary, self.global_step)
+
+            with self.writer.as_default():
+                self.tf.summary.scalar(name, value.item(), self.global_step)
+
         self.global_step += 1
 
         self.writer.flush()
@@ -103,11 +108,14 @@ class TensorBoardBatch(TensorBoard):
         for name, value in logs.items():
             if name in ['batch', 'size']:
                 continue
-            summary = self.tf.Summary()
-            summary_value = summary.value.add()
-            summary_value.simple_value = value #.item()
-            summary_value.tag = name
-            self.writer.add_summary(summary, self.global_step)
+            # summary = self.tf.summary()
+            # summary_value = summary.value.add()
+            # summary_value.simple_value = value #.item()
+            # summary_value.tag = name
+            # self.writer.add_summary(summary, self.global_step)
+
+            with self.writer.as_default():
+                self.tf.summary.scalar(name, value, self.global_step)
 
         self.global_step += 1
         self.writer.flush()
