@@ -8,6 +8,7 @@ import numpy as np
 from cv2 import imwrite, imread
 
 import img_utils
+import project_settings as cfg
 
 
 def dict_raise_on_duplicates(ordered_pairs):
@@ -37,11 +38,10 @@ def read_json_file(filename):
     return mdata
 
 
-base_folder = "/media/sf_Data/data_stitching/deepstitch-dataset"
-dataset_folder = base_folder + "/images"
-target_folder = base_folder + "/target"
-training_folder = base_folder + "/train"
-config_file = base_folder + "/config_file.json"
+dataset_folder = cfg.base_folder + "/images"
+target_folder = cfg.base_folder + "/target"
+training_folder = cfg.base_folder + "/train"
+config_file = cfg.base_folder + "/config_file.json"
 
 
 def prepare_data(step=32, patch_size=128):

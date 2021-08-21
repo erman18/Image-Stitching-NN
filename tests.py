@@ -54,9 +54,9 @@ if __name__ == "__main__":
     Train Stitching Model CNN
     """
 
-    # sr = model_stitching.ImageStitchingModel()
-    # sr.create_model(height=128, width=128)
-    # sr.fit(nb_epochs=250, batch_size=32)
+    sr = model_stitching.ImageStitchingModel()
+    sr.create_model(height=128, width=128)
+    sr.fit(nb_epochs=20, batch_size=32)
 
     """
     Train image stitching model Resnet
@@ -126,8 +126,8 @@ if __name__ == "__main__":
     Evaluate Image Stitching
     """
 
-    sr = model_stitching.ImageStitchingModel()
-    sr.stitch("/media/sf_Data/data_stitching/deepstitch-dataset/images/2/tk_0.png")
+    # sr = model_stitching.ImageStitchingModel()
+    # sr.stitch("/media/sf_Data/data_stitching/deepstitch-dataset/images/2/tk_0.png")
 
     """
     Evaluate Super Resolution on Set5/14

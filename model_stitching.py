@@ -1,18 +1,20 @@
 from __future__ import print_function, division
 
-from keras.models import Model
-from keras.layers import Concatenate, Add, Average, Input, Dense, Flatten, BatchNormalization, Activation, LeakyReLU
-from keras.layers.convolutional import Convolution2D, MaxPooling2D, UpSampling2D, Convolution2DTranspose
-from keras import backend as K
-from keras.utils.np_utils import to_categorical
-import keras.callbacks as callbacks
-import keras.optimizers as optimizers
+import tensorflow as tf
+from tensorflow.keras.models import Model
+from tensorflow.keras.layers import Concatenate, Add, Average, Input, Dense, Flatten, BatchNormalization, Activation, LeakyReLU
+from tensorflow.keras.layers import Convolution2D, MaxPooling2D, UpSampling2D, Convolution2DTranspose
+from tensorflow.keras import backend as K
+# from tensorflow.keras.utils.np_utils import to_categorical
+import tensorflow.keras.callbacks as callbacks
+import tensorflow.keras.optimizers as optimizers
 
 from advanced import HistoryCheckpoint, SubPixelUpscaling, non_local_block, TensorBoardBatch
 import img_utils
-from data_generator import DataGenerator, image_stitching_generator
+from data_generator import DataGenerator, image_stitching_generator, read_img_dataset
 import prepare_stitching_data as psd
 from sklearn.model_selection import train_test_split
+import project_settings as cfg
 
 import numpy as np
 import os
@@ -108,12 +110,17 @@ class BaseSuperStitchingModel(object):
         val_count = len(test_indexes)
 
         # Generators
-        training_generator = image_stitching_generator(train_indexes, config_data,
-                                                       callee="training_generator", **params)
-        validation_generator = image_stitching_generator(test_indexes, config_data,
-                                                         callee="validation_generator", **params)
+        # training_generator = image_stitching_generator(train_indexes, config_data,
+        #                                                callee="training_generator", **params)
+        # validation_generator = image_stitching_generator(test_indexes, config_data,
+        #                                                  callee="validation_generator", **params)
         # training_generator = DataGenerator(train_indexes, config_data, callee="training_generator", **params)
         # validation_generator = DataGenerator(test_indexes, config_data, callee="validation_generator", **params)
+
+        training_generator = read_img_dataset(train_indexes, config_data, callee="training_generator", **params)
+        # training_generator = read_img_dataset([23, 50, 400], config_data, callee="training_generator", **params)
+        validation_generator = read_img_dataset(test_indexes, config_data, callee="validation_generator", **params)
+        # validation_generator = read_img_dataset([10, 40, 500], config_data, callee="validation_generator", **params)
 
         if save_history:
             callback_list.append(HistoryCheckpoint(history_fn))
@@ -145,24 +152,36 @@ class BaseSuperStitchingModel(object):
         #                          validation_steps=val_count // batch_size + 1,
         #                          use_multiprocessing=True,
         #                          workers=2)
-        self.model.fit_generator(generator=training_generator,
-                                 steps_per_epoch=samples_per_epoch // batch_size + 1,
-                                 epochs=nb_epochs,
-                                 callbacks=callback_list,
-                                 validation_data=validation_generator,
-                                 validation_steps=val_count // batch_size + 1,
-                                 validation_freq=2,
-                                 use_multiprocessing=False)
+        # self.model.fit_generator(generator=training_generator,
+        #                          steps_per_epoch=samples_per_epoch // batch_size + 1,
+        #                          epochs=nb_epochs,
+        #                          callbacks=callback_list,
+        #                          validation_data=validation_generator,
+        #                          validation_steps=val_count // batch_size + 1,
+        #                          validation_freq=2,
+        #                          use_multiprocessing=False)
+
+        # print(list(training_generator.enumerate()))
+        # for item in training_generator.enumerate(start=0):
+        #     print(item)
+
+        self.model.fit(training_generator,
+                       epochs=nb_epochs,
+                       steps_per_epoch=samples_per_epoch // batch_size + 1,
+                       callbacks=callback_list,
+                       validation_data=validation_generator,
+                       validation_steps=val_count // batch_size + 1)
 
         return self.model
 
     def evaluate(self, validation_dir):
         pass
 
-    def stitch(self, img_path, save_intermediate=False, return_image=False, suffix="stitch",
+    def stitch(self, img_path, out_folder=None, save_intermediate=False, return_image=False, suffix="stitch",
                patch_size=8, mode="patch", verbose=True):
         """
         Standard method to upscale an image.
+        :param out_folder: Output folder to save all the results (including intermediate results0
         :param img_path:  path to the image
         :param save_intermediate: saves the intermediate upscaled image (bilinear upscale)
         :param return_image: returns a image of shape (height, width, channels).
@@ -173,8 +192,17 @@ class BaseSuperStitchingModel(object):
         """
 
         # Destination path
-        path = os.path.splitext(img_path)
-        filename = path[0] + "_" + suffix + "stitch" + path[1]
+        if out_folder is None:
+            # os.path.dirname(os.path.dirname(img_path))
+            out_dirname = os.path.abspath(os.path.join(os.path.dirname(img_path), "../.."))
+            out_dirname = os.path.join(out_dirname, "out_result")
+        else:
+            out_dirname = out_folder
+
+        print("Output Result Folder: %s" % out_dirname)
+        os.makedirs(out_dirname, exist_ok=True)
+        path = os.path.splitext(os.path.basename(img_path))
+        filename = os.path.join(out_dirname, path[0] + "_" + suffix + time.strftime("_%Y%m%d-%H%M%S") + path[1])
 
         # Read image
         # true_img = imread(img_path)
@@ -230,20 +258,16 @@ class BaseSuperStitchingModel(object):
 
         print("Convolution image data point ready to be used: ", img_conv.shape)
 
-        model = self.create_model(h, w, load_weights=True)
+        model = self.create_model(height=h, width=w, load_weights=True)
         if verbose: print("Model loaded.")
 
         # Create prediction for image patches
         print("Starting the image stitching prediction")
         result = model.predict(img_conv, verbose=verbose)
 
+        # Deprocess patches
         if verbose: print("De-processing images.")
 
-        # Deprocess patches
-        # if K.image_dim_ordering() == "th":
-        #     result = result.transpose((0, 2, 3, 1)).astype(np.float32) * 255.
-        # else:
-        #     result = result.astype(np.float32) * 255.
         result = result.transpose((0, 2, 1, 3)).astype(np.float32) * 255.
 
         result = result[0, :, :, :]  # Access the 3 Dimensional image vector
@@ -275,17 +299,24 @@ class BaseSuperStitchingModel(object):
 
         true_img = cv2.imread(img_path)
         h, w = true_img.shape[0], true_img.shape[1]
+        print("Original Shape: ", h, w)
 
-        X = np.zeros((1, h, w, 15))
+        final_h, final_w = int(true_img.shape[0]/2), int(true_img.shape[1]/2)
+        print("Final Shape After Resize", final_h, final_w)
+        # true_img = cv2.resize(true_img, (final_h, final_w))
+
+        X = np.zeros((1, final_h, final_w, 15))
 
         for img_idx, img_path in enumerate(files):
             img = cv2.imread(img_path)  # pilmode='RGB'
             img[np.where((img == [255, 255, 255]).all(axis=2))] = [0, 0, 0]
+            img = cv2.resize(img, (final_w, final_h))
+            print("image shape %d" % img_idx, img.shape)
             j = 3 * img_idx
 
             X[0, :, :, j:(j + 3)] = img
 
-        return X, h, w
+        return X, final_h, final_w
 
 
 class NonLocalResNetStitching(BaseSuperStitchingModel):
