@@ -4,6 +4,7 @@ from keras.utils.vis_utils import plot_model
 import models
 import model_stitching
 import img_utils
+import project_settings as cfg
 
 if __name__ == "__main__":
     path = r"headline_carspeed.jpg"
@@ -127,7 +128,7 @@ if __name__ == "__main__":
     """
 
     # sr = model_stitching.ImageStitchingModel()
-    # sr.stitch("/media/sf_Data/data_stitching/deepstitch-dataset/images/2/tk_0.png")
+    # sr.stitch(cfg.base_folder + "/images/2/tk_0.png")
 
     """
     Evaluate Super Resolution on Set5/14
