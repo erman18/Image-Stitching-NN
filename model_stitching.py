@@ -57,7 +57,7 @@ def psnr(y_true, y_pred):
     return -10. * np.log10(np.mean(np.square(y_pred - y_true)))
 
 
-class BaseSuperStitchingModel(object):
+class BaseStitchingModel(object):
 
     def __init__(self, model_name):
         """
@@ -80,8 +80,7 @@ class BaseSuperStitchingModel(object):
         """
         Subclass dependent implementation.
         """
-        if width is not None and height is not None:
-            self.shape = (width, height, channels * nb_camera)
+        self.shape = (width, height, channels * nb_camera)
 
         init = Input(shape=self.shape)
 
@@ -320,7 +319,7 @@ class BaseSuperStitchingModel(object):
         return X, final_h, final_w
 
 
-class NonLocalResNetStitching(BaseSuperStitchingModel):
+class NonLocalResNetStitching(BaseStitchingModel):
 
     def __init__(self):
         super(NonLocalResNetStitching, self).__init__("NonLocalResNetSR")
@@ -359,7 +358,9 @@ class NonLocalResNetStitching(BaseSuperStitchingModel):
 
         adam = optimizers.Adam(learning_rate=1e-3)
         model.compile(optimizer=adam, loss='mse', metrics=[PSNRLoss])
-        if load_weights: model.load_weights(self.weight_path, by_name=True)
+        if load_weights:
+            model.load_weights(self.weight_path, by_name=True)
+        model.summary()
 
         self.model = model
         return model
@@ -396,7 +397,7 @@ class NonLocalResNetStitching(BaseSuperStitchingModel):
         super(NonLocalResNetStitching, self).fit(batch_size, nb_epochs, save_history, history_fn)
 
 
-class ImageStitchingModel(BaseSuperStitchingModel):
+class ImageStitchingModel(BaseStitchingModel):
 
     def __init__(self):
         super(ImageStitchingModel, self).__init__("Image Stitching Model")
@@ -433,5 +434,104 @@ class ImageStitchingModel(BaseSuperStitchingModel):
         self.model = model
         return model
 
-    def fit(self, batch_size=128, nb_epochs=100, save_history=True, history_fn="SRCNN History.txt"):
+    def fit(self, batch_size=128, nb_epochs=100, save_history=True, history_fn="ISCNN History.txt"):
         return super(ImageStitchingModel, self).fit(batch_size, nb_epochs, save_history, history_fn)
+
+
+class ExpantionStitching(BaseStitchingModel):
+
+    def __init__(self):
+        super(ExpantionStitching, self).__init__("Expanded Image SR")
+
+        self.f1 = 9
+        self.f2_1 = 1
+        self.f2_2 = 3
+        self.f2_3 = 5
+        self.f3 = 5
+
+        self.n1 = 64
+        self.n2 = 32
+
+        self.weight_path = "weights/ExpantionStitchWeights.h5"
+
+    def create_model(self, height=32, width=32, channels=3, nb_camera=5, load_weights=False):
+        """
+            Creates a model to be used to scale images of specific height and width.
+        """
+        init = super(ExpantionStitching, self).create_model(height=height, width=width, channels=channels,
+                                                            nb_camera=nb_camera, load_weights=load_weights)
+
+        x = Convolution2D(self.n1, (self.f1, self.f1), activation='relu', padding='same', name='level1')(init)
+
+        x1 = Convolution2D(self.n2, (self.f2_1, self.f2_1), activation='relu', padding='same', name='lavel1_1')(x)
+        x2 = Convolution2D(self.n2, (self.f2_2, self.f2_2), activation='relu', padding='same', name='lavel1_2')(x)
+        x3 = Convolution2D(self.n2, (self.f2_3, self.f2_3), activation='relu', padding='same', name='lavel1_3')(x)
+
+        x = Average()([x1, x2, x3])
+
+        out = Convolution2D(channels, (self.f3, self.f3), activation='relu', padding='same', name='output')(x)
+
+        model = Model(init, out)
+        adam = optimizers.Adam(lr=1e-3)
+        model.compile(optimizer=adam, loss='mse', metrics=[PSNRLoss])
+        if load_weights:
+            model.load_weights(self.weight_path)
+        model.summary()
+
+        self.model = model
+        return model
+
+    def fit(self, batch_size=128, nb_epochs=100, save_history=True, history_fn="ESRCNN History IS.txt"):
+        return super(ExpantionStitching, self).fit(batch_size, nb_epochs, save_history, history_fn)
+
+
+class DenoisingAutoEncoderStitch(BaseStitchingModel):
+
+    def __init__(self):
+        super(DenoisingAutoEncoderStitch, self).__init__("Denoise AutoEncoder IS")
+
+        self.n1 = 64
+        self.n2 = 32
+
+        self.weight_path = "weights/DenoiseAutoEncoderStitch.h5"
+
+    def create_model(self, height=32, width=32, channels=3, nb_camera=5, load_weights=False):
+        """
+            Creates a model to remove / reduce noise from upscaled images.
+        """
+        from keras.layers.convolutional import Deconvolution2D
+
+        # Perform check that model input shape is divisible by 4
+        init = super(DenoisingAutoEncoderStitch, self).create_model(height=height, width=width, channels=channels,
+                                                                    load_weights=load_weights)
+
+        # if K.image_dim_ordering() == "th":
+        #     output_shape = (None, channels, width, height)
+        # else:
+        #     output_shape = (None, width, height, channels)
+        output_shape = (None, width, height, channels)
+
+        level1_1 = Convolution2D(self.n1, (3, 3), activation='relu', padding='same')(init)
+        level2_1 = Convolution2D(self.n1, (3, 3), activation='relu', padding='same')(level1_1)
+
+        level2_2 = Convolution2DTranspose(self.n1, (3, 3), activation='relu', padding='same')(level2_1)
+        level2 = Add()([level2_1, level2_2])
+
+        level1_2 = Convolution2DTranspose(self.n1, (3, 3), activation='relu', padding='same')(level2)
+        level1 = Add()([level1_1, level1_2])
+
+        decoded = Convolution2D(channels, (5, 5), activation='linear', padding='same')(level1)
+
+        model = Model(init, decoded)
+        adam = optimizers.Adam(lr=1e-3)
+        model.compile(optimizer=adam, loss='mse', metrics=[PSNRLoss])
+        if load_weights:
+            model.load_weights(self.weight_path)
+        model.summary()
+
+        self.model = model
+        return model
+
+    def fit(self, batch_size=128, nb_epochs=100, save_history=True, history_fn="DSRCNN HistoryIS.txt"):
+        return super(DenoisingAutoEncoderStitch, self).fit(batch_size, nb_epochs, save_history, history_fn)
+

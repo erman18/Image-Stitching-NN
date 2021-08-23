@@ -63,9 +63,25 @@ if __name__ == "__main__":
     Train image stitching model Resnet
     """
 
-    sr = model_stitching.NonLocalResNetStitching()
-    sr.create_model(height=128, width=128)
-    sr.fit(nb_epochs=10, batch_size=32)
+    # sr = model_stitching.NonLocalResNetStitching()
+    # sr.create_model(height=128, width=128)
+    # sr.fit(nb_epochs=10, batch_size=32)
+
+    """
+    Train image stitching model Resnet
+    """
+
+    # sr = model_stitching.ExpantionStitching()
+    # sr.create_model(height=128, width=128)
+    # sr.fit(nb_epochs=10, batch_size=32)
+
+    """
+    Train image stitching model Resnet
+    """
+
+    # sr = model_stitching.DenoisingAutoEncoderStitch()
+    # sr.create_model(height=128, width=128)
+    # sr.fit(nb_epochs=10, batch_size=32)
 
     """
     Train ExpantionSuperResolution => Did not work
@@ -129,6 +145,20 @@ if __name__ == "__main__":
 
     # sr = model_stitching.ImageStitchingModel()
     # sr.stitch(cfg.base_folder + "/images/2/tk_0.png")
+
+    """
+    Evaluate Image Stitching
+    """
+
+    # sr = model_stitching.ExpantionStitching()
+    # sr.stitch(cfg.base_folder + "/images/2/tk_0.png")
+
+    """
+    Evaluate Image Stitching
+    """
+
+    sr = model_stitching.DenoisingAutoEncoderStitch()
+    sr.stitch(cfg.base_folder + "/images/2/tk_0.png")
 
     """
     Evaluate Super Resolution on Set5/14
