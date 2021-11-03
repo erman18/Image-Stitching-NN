@@ -63,9 +63,9 @@ if __name__ == "__main__":
     Train image stitching model Resnet
     """
 
-    # sr = model_stitching.NonLocalResNetStitching()
-    # sr.create_model(height=128, width=128)
-    # sr.fit(nb_epochs=10, batch_size=32)
+    sr = model_stitching.NonLocalResNetStitching()
+    sr.create_model(height=128, width=128)
+    sr.fit(nb_epochs=10, batch_size=32)
 
     """
     Train image stitching model Resnet
