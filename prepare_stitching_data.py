@@ -216,6 +216,7 @@ if __name__ == "__main__":
             print(f"Error: Cannot stitch image [{img_id}] - [{output_result}]")
 
     print("First image stitched: ", stitcher)
+    multi_band_blend = 0  # 0 is for linear blending
     time.sleep(10)
     for img_id in range(total_img):
         print(f"-----------------------------{img_id}------------------------")
@@ -226,7 +227,7 @@ if __name__ == "__main__":
         print(f"Try to build from new images {img_id}/{total_img}")
         print(file_list)
         # time.sleep(10)
-        mat = stitcher.build_from_new_images(file_list, 0)
+        mat = stitcher.build_from_new_images(file_list, multi_band_blend)
         print(f"Done building from new images {img_id}/{total_img}")
         # time.sleep(10)
         pano.write_img(output_result, mat)
@@ -235,6 +236,7 @@ if __name__ == "__main__":
 
     # pano.test_extrema(mat, 1)
     print("done stitching!", nb_stitched_img)
+    # pano.print_config()
 
     # p = np.array(mat, copy=False)
 
