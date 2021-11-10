@@ -13,7 +13,6 @@ import img_utils
 import project_settings as cfg
 
 sys.path.append(cfg.pano_libs_dir)
-import libpyopenpano as pano
 import pylab as plt
 
 
@@ -129,56 +128,26 @@ def prepare_data(step=32, patch_size=128):
 
 
 if __name__ == "__main__":
-    # # prepare_data()
-    # import sys
-    # # for k in os.environ:
-    # #     print(k, ":", os.environ[k])
-    #
-    # # print(sys.path)
-    # # home_dir="/home/erman/projects/Image-Stitching-NN/libs/pano"
-    # # sys.path.append(home_dir)
-    #
-    # # try:
-    # #     import libpyopenpano as pano
-    # # except ImportError:
-    # #     # Add $PWD/libs/pano to sys.path so Python can find the
-    # #     # libpyopenpano module.
-    # #     print(os.environ['PWD'] + "/libs/pano")
-    # #     sys.path.append(os.environ['PWD'] + "/libs/pano")
-    # #     import libpyopenpano as pano
-    #
-    # # from ctypes import *
-    # # lib1 = cdll.LoadLibrary('/home/erman/projects/Image-Stitching-NN/libs/pano/liblodepng.so')
-    # # lib1 = cdll.LoadLibrary('/home/erman/projects/Image-Stitching-NN/libs/pano/libopenpano.so')
-    # # pano = cdll.LoadLibrary('/home/erman/projects/Image-Stitching-NN/libs/pano/libpyopenpano.so')
-    #
-    # # import ctypes
-    # # import importlib
-    # # ctypes.CDLL('/home/erman/projects/Image-Stitching-NN/libs/pano/liblodepng.so')
-    # # ctypes.CDLL('/home/erman/projects/Image-Stitching-NN/libs/pano/libopenpano.so')
-    # # ctypes.CDLL('/home/erman/projects/Image-Stitching-NN/libs/pano/libpyopenpano.so')
-    # # pano = importlib.import_module('openpano')
-    #
-    # config_file = "/home/erman/immersion/OpenPano/src/config.cfg"
-    # img_data = cfg.project_dir + "/train_images/validation/y/1_1.png"
+    # prepare_data()
 
+    import libpyopenpano as pano
+    # help(pano)
+    # Test Stitching
     pano.print_config()
     pano.init_config(cfg.pano_config_file)
     pano.print_config()
 
-    # Test Read Image function
-    # img_data = cfg.project_dir + "/input_images/t1.bmp"
-    # mat = pano.read_img(img_data)
-    # mat.cols()
-    # mat.rows()
-
-    # help(pano)
-    # Test Stitching
     mdata = [
         {
             "img_pattern": "/media/sf_Data/data_stitching/Terrace/Input/{:05d}/{:05d}.jpg",
             "out_dir": "/media/sf_Data/data_stitching/Terrace/Out2",
-            "nb_camera": 14,
+            "nb_cameras": 14,
+            "total_img": 430,
+        },
+        {
+            "img_pattern": "/media/sf_Data/data_stitching/Terrace/Input/{:05d}/{:05d}.jpg",
+            "out_dir": "/media/sf_Data/data_stitching/Terrace/Out2",
+            "nb_cameras": 14,
             "total_img": 430,
         }
     ]
@@ -186,25 +155,20 @@ if __name__ == "__main__":
     id = 0
     # img_dir = "/media/sf_Data/data_stitching/Terrace/Input/{:05d}/{:05d}.jpg"
     out_dir = mdata[id]["out_dir"]
-    nb_camera = mdata[id]["nb_camera"]
+    nb_camera = mdata[id]["nb_cameras"]
     total_img = mdata[id]["total_img"]
     os.makedirs(out_dir, exist_ok=True)
+    output_result = None
 
     nb_stitched_img = 0
     stitcher = None
     for img_id in range(total_img):
         print(f"-----------------------------{img_id}------------------------")
-        file_list = [mdata[id]["img_pattern"].format(i, img_id) for i in range(mdata[id]["nb_camera"])]
+        file_list = [mdata[id]["img_pattern"].format(i, img_id) for i in range(mdata[id]["nb_cameras"])]
         output_result = f"{out_dir}/{img_id:05d}.jpg"
 
         print(file_list)
         print(output_result)
-
-        # try:
-        #     mat = pano.create_pano(file_list)
-        #     pano.write_img(output_result, mat)
-        # except:
-        #     print(f"Error: Cannot stitch image [{img_id}] - [{output_result}]")
 
         stitcher = None
         try:
@@ -215,30 +179,28 @@ if __name__ == "__main__":
         except:
             print(f"Error: Cannot stitch image [{img_id}] - [{output_result}]")
 
-    print("First image stitched: ", stitcher)
+    print(f"First image stitched: {stitcher} --> Location: {output_result}")
     multi_band_blend = 0  # 0 is for linear blending
     time.sleep(10)
     for img_id in range(total_img):
         print(f"-----------------------------{img_id}------------------------")
-        file_list = [mdata[id]["img_pattern"].format(i, img_id) for i in range(mdata[id]["nb_camera"])]
+        file_list = [mdata[id]["img_pattern"].format(i, img_id) for i in range(mdata[id]["nb_cameras"])]
         output_result = f"{out_dir}/{img_id:05d}.jpg"
 
-        # try:
-        print(f"Try to build from new images {img_id}/{total_img}")
-        print(file_list)
-        # time.sleep(10)
-        mat = stitcher.build_from_new_images(file_list, multi_band_blend)
-        print(f"Done building from new images {img_id}/{total_img}")
-        # time.sleep(10)
-        pano.write_img(output_result, mat)
-        # except:
-        #     print(f"[build_from_new_images] Error: Cannot stitch image [{img_id}] - [{output_result}]")
+        try:
+            print(f"Try to build from new images {img_id}/{total_img}")
+            # print(file_list)
+            mat = stitcher.build_from_new_images(file_list, multi_band_blend)
+            print(f"Done building from new images {img_id}/{total_img}")
+            # time.sleep(10)
+            pano.write_img(output_result, mat)
+        except:
+            print(f"[build_from_new_images] Error: Cannot stitch image [{img_id}] - [{output_result}]")
 
     # pano.test_extrema(mat, 1)
     print("done stitching!", nb_stitched_img)
     # pano.print_config()
 
     # p = np.array(mat, copy=False)
-
     # plt.imshow(p)
     # plt.show()

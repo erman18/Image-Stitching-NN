@@ -8,7 +8,7 @@ from keras.utils.np_utils import to_categorical
 import keras.callbacks as callbacks
 import keras.optimizers as optimizers
 
-from advanced import HistoryCheckpoint, SubPixelUpscaling, non_local_block, TensorBoardBatch
+from advanced import HistoryCheckpoint, non_local_block, TensorBoardBatch
 import img_utils
 from imageio import imwrite
 

@@ -1,12 +1,12 @@
 import itertools
 
-from keras.layers import Activation, Reshape, Lambda, concatenate, dot, add
-from keras.layers import Conv1D, Conv2D, Conv3D
-from keras.layers import MaxPool1D
+from tensorflow.keras.layers import Activation, Reshape, Lambda, concatenate, dot, add
+from tensorflow.keras.layers import Conv1D, Conv2D, Conv3D
+from tensorflow.keras.layers import MaxPool1D
 
-from keras.callbacks import Callback, TensorBoard
-from keras.engine.topology import Layer
-from keras import backend as K
+from tensorflow.keras.callbacks import Callback, TensorBoard
+# from keras.engine.topology import Layer
+from tensorflow.keras import backend as K
 
 ''' Callbacks '''
 
@@ -223,32 +223,32 @@ def depth_to_scale_tf(input, scale, channels):
 Implementation is incomplete. Use lambda layer for now.
 '''
 
-
-class SubPixelUpscaling(Layer):
-
-    def __init__(self, r, channels, **kwargs):
-        super(SubPixelUpscaling, self).__init__(**kwargs)
-
-        self.r = r
-        self.channels = channels
-
-    def build(self, input_shape):
-        pass
-
-    def call(self, x, mask=None):
-        if K.backend() == "theano":
-            y = depth_to_scale_th(x, self.r, self.channels)
-        else:
-            y = depth_to_scale_tf(x, self.r, self.channels)
-        return y
-
-    def get_output_shape_for(self, input_shape):
-        if K.image_dim_ordering() == "th":
-            b, k, r, c = input_shape
-            return b, self.channels, r * self.r, c * self.r
-        else:
-            b, r, c, k = input_shape
-            return b, r * self.r, c * self.r, self.channels
+#
+# class SubPixelUpscaling(Layer):
+#
+#     def __init__(self, r, channels, **kwargs):
+#         super(SubPixelUpscaling, self).__init__(**kwargs)
+#
+#         self.r = r
+#         self.channels = channels
+#
+#     def build(self, input_shape):
+#         pass
+#
+#     def call(self, x, mask=None):
+#         if K.backend() == "theano":
+#             y = depth_to_scale_th(x, self.r, self.channels)
+#         else:
+#             y = depth_to_scale_tf(x, self.r, self.channels)
+#         return y
+#
+#     def get_output_shape_for(self, input_shape):
+#         if K.image_dim_ordering() == "th":
+#             b, k, r, c = input_shape
+#             return b, self.channels, r * self.r, c * self.r
+#         else:
+#             b, r, c, k = input_shape
+#             return b, r * self.r, c * self.r, self.channels
 
 
 ''' Non Local Blocks '''

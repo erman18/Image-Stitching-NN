@@ -2,14 +2,15 @@ from __future__ import print_function, division
 
 import tensorflow as tf
 from tensorflow.keras.models import Model
-from tensorflow.keras.layers import Concatenate, Add, Average, Input, Dense, Flatten, BatchNormalization, Activation, LeakyReLU
+from tensorflow.keras.layers import Concatenate, Add, Average, Input, Dense, Flatten, BatchNormalization, Activation, \
+    LeakyReLU
 from tensorflow.keras.layers import Convolution2D, MaxPooling2D, UpSampling2D, Convolution2DTranspose
 from tensorflow.keras import backend as K
 # from tensorflow.keras.utils.np_utils import to_categorical
 import tensorflow.keras.callbacks as callbacks
 import tensorflow.keras.optimizers as optimizers
 
-from advanced import HistoryCheckpoint, SubPixelUpscaling, non_local_block, TensorBoardBatch
+from advanced import HistoryCheckpoint, non_local_block, TensorBoardBatch
 import img_utils
 from data_generator import DataGenerator, image_stitching_generator, read_img_dataset
 import prepare_stitching_data as psd
@@ -102,6 +103,7 @@ class BaseStitchingModel(object):
                   'n_channels': self.shape[2],
                   'shuffle': True}
 
+        print("*************", self.shape[0], self.shape[1])
         # Datasets
         config_data = psd.read_json_file(psd.config_file)
         data_indexes = np.arange(config_data["total_samples"])
@@ -177,32 +179,33 @@ class BaseStitchingModel(object):
     def evaluate(self, validation_dir):
         pass
 
-    def stitch(self, img_path, out_folder=None, save_intermediate=False, return_image=False, suffix="stitch",
-               patch_size=8, mode="patch", verbose=True):
+    def stitch(self, img_path, out_file=None, suffix=None, return_image=False, scale_factor=1, verbose=True):
         """
         Standard method to upscale an image.
-        :param out_folder: Output folder to save all the results (including intermediate results0
-        :param img_path:  path to the image
-        :param save_intermediate: saves the intermediate upscaled image (bilinear upscale)
+        :param img_path: list of path to input images
+        :param out_file: Output folder to save all the results
+        :param suffix: Suffix the be added to the output filename
         :param return_image: returns a image of shape (height, width, channels).
-        :param suffix: suffix of upscaled image
-        :param patch_size: size of each patch grid
+        :param scale_factor: image scaled factor to resize input images
         :param verbose: whether to print messages
         :param mode: mode of upscaling. Can be "patch" or "fast"
         """
 
         # Destination path
-        if out_folder is None:
-            # os.path.dirname(os.path.dirname(img_path))
-            out_dirname = os.path.abspath(os.path.join(os.path.dirname(img_path), "../.."))
+        if out_file is None:
+            # out_dirname = os.path.abspath(os.path.dirname(img_path[0]))
+            img_pathname = os.path.splitext(os.path.basename(img_path[0]))
+            out_dirname = os.path.abspath(os.path.join(os.path.dirname(img_path[0]), "../.."))
             out_dirname = os.path.join(out_dirname, "out_result")
+            filename = os.path.join(out_dirname, "result_" + str(suffix) +
+                                    time.strftime("_%Y%m%d-%H%M%S") + img_pathname[1])
         else:
-            out_dirname = out_folder
+            filename = out_file
 
-        print("Output Result Folder: %s" % out_dirname)
-        os.makedirs(out_dirname, exist_ok=True)
-        path = os.path.splitext(os.path.basename(img_path))
-        filename = os.path.join(out_dirname, path[0] + "_" + suffix + time.strftime("_%Y%m%d-%H%M%S") + path[1])
+        print("Output Result File: %s" % filename)
+        # os.makedirs(out_dirname, exist_ok=True)
+        # path = os.path.splitext(os.path.basename(img_path))
+        # filename = os.path.join(out_dirname, path[0] + "_" + suffix + time.strftime("_%Y%m%d-%H%M%S") + path[1])
 
         # Read image
         # true_img = imread(img_path)
@@ -253,7 +256,7 @@ class BaseStitchingModel(object):
         # #     img_conv = images.astype(np.float32) / 255.
         # img_conv = images.transpose((0, 2, 1, 3)).astype(np.float32) / 255.
 
-        img_conv, h, w = self.__read_conv_img(img_path)
+        img_conv, h, w = self.__read_conv_img(img_path, scale_factor)
         img_conv = img_conv.transpose((0, 2, 1, 3)).astype(np.float32) / 255.
 
         print("Convolution image data point ready to be used: ", img_conv.shape)
@@ -289,25 +292,25 @@ class BaseStitchingModel(object):
         if verbose: print("Saving image.", filename)
         cv2.imwrite(filename, result)
 
-    def __read_conv_img(self, img_path):
+    def __read_conv_img(self, img_paths: list, scaled_factor):
 
-        img_dir = os.path.dirname(img_path)
-        files = []
-        exts = ["*.jpg", "*.jpeg", "*.png", "*.bmp", "*.gif"]
-        for ext in exts:
-            files.extend(glob.glob(os.path.join(img_dir, ext)))
+        # img_dir = os.path.dirname(img_path)
+        # files = []
+        # exts = ["*.jpg", "*.jpeg", "*.png", "*.bmp", "*.gif"]
+        # for ext in exts:
+        #     files.extend(glob.glob(os.path.join(img_dir, ext)))
 
-        true_img = cv2.imread(img_path)
+        true_img = cv2.imread(img_paths[0])
         h, w = true_img.shape[0], true_img.shape[1]
         print("Original Shape: ", h, w)
 
-        final_h, final_w = int(true_img.shape[0]/2), int(true_img.shape[1]/2)
+        final_h, final_w = int(true_img.shape[0] / scaled_factor), int(true_img.shape[1] / scaled_factor)
         print("Final Shape After Resize", final_h, final_w)
         # true_img = cv2.resize(true_img, (final_h, final_w))
 
         X = np.zeros((1, final_h, final_w, 15))
 
-        for img_idx, img_path in enumerate(files):
+        for img_idx, img_path in enumerate(img_paths):
             img = cv2.imread(img_path)  # pilmode='RGB'
             img[np.where((img == [255, 255, 255]).all(axis=2))] = [0, 0, 0]
             img = cv2.resize(img, (final_w, final_h))
@@ -318,28 +321,80 @@ class BaseStitchingModel(object):
 
         return X, final_h, final_w
 
+    def simple_stitch(self, img_conv, out_dir, suffix=None, return_image=False, scale_factor=1, verbose=True):
+        """
+        Standard method to upscale an image.
+        :param img_path: list of path to input images
+        :param out_file: Output folder to save all the results
+        :param suffix: Suffix the be added to the output filename
+        :param return_image: returns a image of shape (height, width, channels).
+        :param scale_factor: image scaled factor to resize input images
+        :param verbose: whether to print messages
+        :param mode: mode of upscaling. Can be "patch" or "fast"
+        """
 
-class NonLocalResNetStitching(BaseStitchingModel):
+        filename = os.path.join(out_dir, "result_" + str(suffix) +
+                                    time.strftime("_%Y%m%d-%H%M%S") + ".jpg")
+        print("Output Result File: %s" % filename)
+
+        # img_conv, h, w = self.__read_conv_img(img_path, scale_factor)
+        h, w = img_conv.shape[1], img_conv.shape[2]
+        img_conv = img_conv.transpose((0, 2, 1, 3)) # .astype(np.float32)
+
+        print("Convolution image data point ready to be used: ", img_conv.shape)
+
+        model = self.create_model(height=h, width=w, load_weights=True)
+        if verbose: print("Model loaded.")
+
+        # Create prediction for image patches
+        print("Starting the image stitching prediction")
+        result = model.predict(img_conv, verbose=verbose)
+
+        # Deprocess patches
+        if verbose: print("De-processing images.")
+
+        result = result.transpose((0, 2, 1, 3)).astype(np.float32) * 255.
+
+        result = result[0, :, :, :]  # Access the 3 Dimensional image vector
+
+        result = np.clip(result, 0, 255).astype('uint8')
+
+        if _cv2_available:
+            # used to remove noisy edges
+            result = cv2.pyrUp(result)
+            result = cv2.medianBlur(result, 3)
+            result = cv2.pyrDown(result)
+
+        if verbose: print("\nCompleted De-processing image.")
+
+        if return_image:
+            # Return the image without saving. Useful for testing images.
+            return result
+
+        if verbose: print("Saving image.", filename)
+        cv2.imwrite(filename, result)
+
+
+class ResNetStitch(BaseStitchingModel):
 
     def __init__(self):
-        super(NonLocalResNetStitching, self).__init__("NonLocalResNetSR")
+        super(ResNetStitch, self).__init__("ResNetStitch")
 
         # Treat this model as a denoising auto encoder
         # Force the fit, evaluate and upscale methods to take special care about image shape
         # self.type_requires_divisible_shape = True
         # self.uses_learning_phase = False
 
-        self.n = 32
+        self.n = 64
         self.mode = 2
 
-        self.weight_path = "weights/NonLocalResNetSR_Stitch.h5"
+        self.weight_path = "weights/ResNetStitch.h5"
         # self.type_true_upscaling = True
 
     def create_model(self, height=32, width=32, channels=3, nb_camera=5, load_weights=False):
-        init = super(NonLocalResNetStitching, self).create_model(height, width, channels, nb_camera, load_weights)
+        init = super(ResNetStitch, self).create_model(height, width, channels, nb_camera, load_weights)
 
-        x0 = Convolution2D(self.n, (3, 3), activation='relu', padding='same', name='sr_res_conv1')(init)
-        x0 = non_local_block(x0)
+        x0 = Convolution2D(64, (3, 3), activation='relu', padding='same', name='sr_res_conv1')(init)
 
         x = self._residual_block(x0, 1)
 
@@ -347,10 +402,13 @@ class NonLocalResNetStitching(BaseStitchingModel):
         for i in range(nb_residual):
             x = self._residual_block(x, i + 2)
 
-        x = non_local_block(x, computation_compression=2)
         x = Add()([x, x0])
 
         # x = self._upscale_block(x, 1)
+        # x = Add()([x, x1])
+
+        # x = self._upscale_block(x, 2)
+        # x = Add()([x, x0])
 
         x = Convolution2D(3, (3, 3), activation="linear", padding='same', name='sr_res_conv_final')(x)
 
@@ -370,12 +428,12 @@ class NonLocalResNetStitching(BaseStitchingModel):
         channel_axis = 1 if K.image_data_format() == 'channels_first' else -1
         init = ip
 
-        x = Convolution2D(self.n, (3, 3), activation='linear', padding='same',
+        x = Convolution2D(64, (3, 3), activation='linear', padding='same',
                           name='sr_res_conv_' + str(id) + '_1')(ip)
         x = BatchNormalization(axis=channel_axis, name="sr_res_batchnorm_" + str(id) + "_1")(x, training=mode)
         x = Activation('relu', name="sr_res_activation_" + str(id) + "_1")(x)
 
-        x = Convolution2D(self.n, (3, 3), activation='linear', padding='same',
+        x = Convolution2D(64, (3, 3), activation='linear', padding='same',
                           name='sr_res_conv_' + str(id) + '_2')(x)
         x = BatchNormalization(axis=channel_axis, name="sr_res_batchnorm_" + str(id) + "_2")(x, training=mode)
 
@@ -387,14 +445,20 @@ class NonLocalResNetStitching(BaseStitchingModel):
         init = ip
 
         channel_dim = 1 if K.image_data_format() == 'channels_first' else -1
+        channels = init.shape[channel_dim] # init._keras_shape[channel_dim]
 
+        # x = Convolution2D(256, (3, 3), activation="relu", padding='same', name='sr_res_upconv1_%d' % id)(init)
+        # x = SubPixelUpscaling(r=2, channels=self.n, name='sr_res_upscale1_%d' % id)(x)
         x = UpSampling2D()(init)
         x = Convolution2D(self.n, (3, 3), activation="relu", padding='same', name='sr_res_filter1_%d' % id)(x)
 
+        # x = Convolution2DTranspose(channels, (4, 4), strides=(2, 2), padding='same', activation='relu',
+        #                            name='upsampling_deconv_%d' % id)(init)
+
         return x
 
-    def fit(self, batch_size=128, nb_epochs=100, save_history=True, history_fn="Non Local ResNetSR History.txt"):
-        super(NonLocalResNetStitching, self).fit(batch_size, nb_epochs, save_history, history_fn)
+    def fit(self, batch_size=128, nb_epochs=100, save_history=True, history_fn="ResNetSR History.txt"):
+        super(ResNetStitch, self).fit(batch_size, nb_epochs, save_history, history_fn)
 
 
 class ImageStitchingModel(BaseStitchingModel):
@@ -472,7 +536,7 @@ class ExpantionStitching(BaseStitchingModel):
         out = Convolution2D(channels, (self.f3, self.f3), activation='relu', padding='same', name='output')(x)
 
         model = Model(init, out)
-        adam = optimizers.Adam(lr=1e-3)
+        adam = optimizers.Adam(learning_rate=1e-3)
         model.compile(optimizer=adam, loss='mse', metrics=[PSNRLoss])
         if load_weights:
             model.load_weights(self.weight_path)
@@ -523,7 +587,7 @@ class DenoisingAutoEncoderStitch(BaseStitchingModel):
         decoded = Convolution2D(channels, (5, 5), activation='linear', padding='same')(level1)
 
         model = Model(init, decoded)
-        adam = optimizers.Adam(lr=1e-3)
+        adam = optimizers.Adam(learning_rate=1e-3)
         model.compile(optimizer=adam, loss='mse', metrics=[PSNRLoss])
         if load_weights:
             model.load_weights(self.weight_path)
@@ -535,3 +599,137 @@ class DenoisingAutoEncoderStitch(BaseStitchingModel):
     def fit(self, batch_size=128, nb_epochs=100, save_history=True, history_fn="DSRCNN HistoryIS.txt"):
         return super(DenoisingAutoEncoderStitch, self).fit(batch_size, nb_epochs, save_history, history_fn)
 
+
+class DistilledResNetStitch(BaseStitchingModel):
+
+    def __init__(self):
+        super(DistilledResNetStitch, self).__init__("Distilled ResNet Stitching")
+
+        # Treat this model as a denoising auto encoder
+        # Force the fit, evaluate and upscale methods to take special care about image shape
+        self.type_requires_divisible_shape = True
+        self.uses_learning_phase = False
+
+        self.n = 32
+        self.mode = 2
+
+        self.weight_path = "weights/DistilledResNetStitch.h5"
+
+    def create_model(self, height=32, width=32, channels=3, nb_camera=5, load_weights=False):
+        # init = super(DistilledResNetStich, self).create_model(height, width, channels, load_weights, batch_size)
+        init = super(DistilledResNetStitch, self).create_model(height=height, width=width, channels=channels,
+                                                                    load_weights=load_weights)
+
+        x0 = Convolution2D(self.n, (3, 3), activation='relu', padding='same', name='student_sr_res_conv1')(init)
+
+        x = self._residual_block(x0, 1)
+
+        x = Add(name='student_residual')([x, x0])
+        x = self._upscale_block(x, 1)
+
+        x = Convolution2D(3, (3, 3), activation="linear", padding='same', name='student_sr_res_conv_final')(x)
+
+        model = Model(init, x)
+        # dont compile yet
+        if load_weights:
+            model.load_weights(self.weight_path, by_name=True)
+        model.summary()
+
+        self.model = model
+        return model
+
+    def _residual_block(self, ip, id):
+        mode = False if self.mode == 2 else None
+        channel_axis = 1 if K.image_data_format() == 'channels_first' else -1
+        init = ip
+
+        x = Convolution2D(self.n, (3, 3), activation='linear', padding='same',
+                          name='student_sr_res_conv_' + str(id) + '_1')(ip)
+        x = BatchNormalization(axis=channel_axis, name="student_sr_res_batchnorm_" + str(id) + "_1")(x, training=mode)
+        x = Activation('relu', name="student_sr_res_activation_" + str(id) + "_1")(x)
+
+        x = Convolution2D(self.n, (3, 3), activation='linear', padding='same',
+                          name='student_sr_res_conv_' + str(id) + '_2')(x)
+        x = BatchNormalization(axis=channel_axis, name="student_sr_res_batchnorm_" + str(id) + "_2")(x, training=mode)
+
+        m = Add(name="student_sr_res_merge_" + str(id))([x, init])
+
+        return m
+
+    def _upscale_block(self, ip, id):
+        init = ip
+
+        channel_dim = 1 if K.image_data_format() == 'channels_first' else -1
+        channels = init.shape[channel_dim]
+
+        x = UpSampling2D(name='student_upsampling_%d' % id)(init)
+        x = Convolution2D(self.n * 2, (3, 3), activation="relu", padding='same',
+                          name='student_sr_res_filter1_%d' % id)(x)
+
+        return x
+
+    def fit(self, batch_size=128, nb_epochs=100, save_history=True, history_fn="DistilledResNetStitchHistory.txt"):
+        super(DistilledResNetStitch, self).fit(batch_size, nb_epochs, save_history, history_fn)
+
+
+class DeepDenoiseStitch(BaseStitchingModel):
+
+    def __init__(self):
+        super(DeepDenoiseStitch, self).__init__("Distilled ResNet Stitching")
+
+        # Treat this model as a denoising auto encoder
+        # Force the fit, evaluate and upscale methods to take special care about image shape
+        self.type_requires_divisible_shape = True
+
+        self.n1 = 64
+        self.n2 = 128
+        self.n3 = 256
+
+        self.weight_path = "weights/DeepDenoiseStitch.h5"
+
+    def create_model(self, height=32, width=32, channels=3, nb_camera=5, load_weights=False):
+        # Perform check that model input shape is divisible by 4
+
+        init = super(DeepDenoiseStitch, self).create_model(height=height, width=width, channels=channels,
+                                                               load_weights=load_weights)
+
+        c1 = Convolution2D(self.n1, (3, 3), activation='relu', padding='same')(init)
+        c1 = Convolution2D(self.n1, (3, 3), activation='relu', padding='same')(c1)
+
+        x = MaxPooling2D((2, 2))(c1)
+
+        c2 = Convolution2D(self.n2, (3, 3), activation='relu', padding='same')(x)
+        c2 = Convolution2D(self.n2, (3, 3), activation='relu', padding='same')(c2)
+
+        x = MaxPooling2D((2, 2))(c2)
+
+        c3 = Convolution2D(self.n3, (3, 3), activation='relu', padding='same')(x)
+
+        x = UpSampling2D()(c3)
+
+        c2_2 = Convolution2D(self.n2, (3, 3), activation='relu', padding='same')(x)
+        c2_2 = Convolution2D(self.n2, (3, 3), activation='relu', padding='same')(c2_2)
+
+        m1 = Add()([c2, c2_2])
+        m1 = UpSampling2D()(m1)
+
+        c1_2 = Convolution2D(self.n1, (3, 3), activation='relu', padding='same')(m1)
+        c1_2 = Convolution2D(self.n1, (3, 3), activation='relu', padding='same')(c1_2)
+
+        m2 = Add()([c1, c1_2])
+
+        # decoded = Convolution2D(channels, 5, 5, activation='linear', padding='same')(m2)
+        decoded = Convolution2D(channels, (5, 5), activation='linear', padding='same')(m2)
+
+        model = Model(init, decoded)
+        adam = optimizers.Adam(learning_rate=1e-3)
+        model.compile(optimizer=adam, loss='mse', metrics=[PSNRLoss])
+        if load_weights:
+            model.load_weights(self.weight_path)
+        model.summary()
+
+        self.model = model
+        return model
+
+    def fit(self, batch_size=128, nb_epochs=100, save_history=True, history_fn="DeepDenoiseStichHistory.txt"):
+        super(DeepDenoiseStitch, self).fit(batch_size, nb_epochs, save_history, history_fn)

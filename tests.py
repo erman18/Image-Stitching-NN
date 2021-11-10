@@ -63,7 +63,7 @@ if __name__ == "__main__":
     Train image stitching model Resnet
     """
 
-    sr = model_stitching.NonLocalResNetStitching()
+    sr = model_stitching.ResNetStitch()
     sr.create_model(height=128, width=128)
     sr.fit(nb_epochs=10, batch_size=32)
 
@@ -157,8 +157,8 @@ if __name__ == "__main__":
     Evaluate Image Stitching
     """
 
-    sr = model_stitching.DenoisingAutoEncoderStitch()
-    sr.stitch(cfg.base_folder + "/images/2/tk_0.png")
+    # sr = model_stitching.DenoisingAutoEncoderStitch()
+    # sr.stitch(cfg.base_folder + "/images/2/tk_0.png")
 
     """
     Evaluate Super Resolution on Set5/14
