@@ -12,7 +12,7 @@ import tensorflow.keras.optimizers as optimizers
 
 from advanced import HistoryCheckpoint, non_local_block, TensorBoardBatch
 import img_utils
-from data_generator import DataGenerator, image_stitching_generator, read_img_dataset
+from data_generator import read_img_dataset  # , DataGenerator, image_stitching_generator
 import prepare_stitching_data as psd
 from sklearn.model_selection import train_test_split
 import project_settings as cfg
@@ -31,10 +31,10 @@ except:
     warnings.warn('Could not load opencv properly. This may affect the quality of output images.')
     _cv2_available = False
 
-train_path = img_utils.output_path
-validation_path = img_utils.validation_output_path
-path_X = img_utils.output_path + "X/"
-path_Y = img_utils.output_path + "y/"
+# train_path = img_utils.output_path
+# validation_path = img_utils.validation_output_path
+# path_X = img_utils.output_path + "X/"
+# path_Y = img_utils.output_path + "y/"
 
 
 def PSNRLoss(y_true, y_pred):
@@ -56,6 +56,16 @@ def psnr(y_true, y_pred):
                                                                                     str(y_pred.shape))
 
     return -10. * np.log10(np.mean(np.square(y_pred - y_true)))
+
+#
+# def custom_loss(y_true, y_pred):
+#     dy0, dx0 = tf.image.image_gradients(y_true)
+#     dy1, dx1 = tf.image.image_gradients(y_pred)
+#
+#     mse = K.mean(K.square(y_pred - y_true))
+#     l0 = K.mean(K.square(y_pred - y_true))
+#
+#     return
 
 
 class BaseStitchingModel(object):
@@ -105,7 +115,7 @@ class BaseStitchingModel(object):
 
         print("*************", self.shape[0], self.shape[1])
         # Datasets
-        config_data = psd.read_json_file(psd.config_file)
+        config_data = psd.read_json_file(cfg.config_img_output)
         data_indexes = np.arange(config_data["total_samples"])
         train_indexes, test_indexes = train_test_split(data_indexes, test_size=0.10)
         samples_per_epoch = len(train_indexes)
@@ -125,10 +135,10 @@ class BaseStitchingModel(object):
         # validation_generator = read_img_dataset([10, 40, 500], config_data, callee="validation_generator", **params)
 
         if save_history:
-            callback_list.append(HistoryCheckpoint(history_fn))
+            callback_list.append(HistoryCheckpoint(f'{cfg.log_dir}/{history_fn}'))
 
             if K.backend() == 'tensorflow':
-                log_dir = './%s_logs/' % self.model_name
+                log_dir = f'{cfg.log_dir}/{self.model_name}_logs/'
                 tensorboard = TensorBoardBatch(log_dir, batch_size=batch_size)
                 callback_list.append(tensorboard)
 
@@ -172,7 +182,9 @@ class BaseStitchingModel(object):
                        steps_per_epoch=samples_per_epoch // batch_size + 1,
                        callbacks=callback_list,
                        validation_data=validation_generator,
-                       validation_steps=val_count // batch_size + 1)
+                       validation_steps=val_count // batch_size + 1,
+                       use_multiprocessing=True,
+                       workers=2)
 
         return self.model
 
@@ -372,6 +384,8 @@ class BaseStitchingModel(object):
             return result
 
         if verbose: print("Saving image.", filename)
+        # Convert into BGR to save with OpenCV
+        result = cv2.cvtColor(result, cv2.COLOR_RGB2BGR)
         cv2.imwrite(filename, result)
 
 
@@ -417,6 +431,7 @@ class ResNetStitch(BaseStitchingModel):
         adam = optimizers.Adam(learning_rate=1e-3)
         model.compile(optimizer=adam, loss='mse', metrics=[PSNRLoss])
         if load_weights:
+            print(f"Loading model weights at {self.weight_path}...")
             model.load_weights(self.weight_path, by_name=True)
         model.summary()
 
@@ -492,6 +507,7 @@ class ImageStitchingModel(BaseStitchingModel):
         adam = optimizers.Adam(learning_rate=1e-3)
         model.compile(optimizer=adam, loss='mse', metrics=[PSNRLoss])
         if load_weights:
+            print(f"Loading model weights at {self.weight_path}...")
             model.load_weights(self.weight_path)
         model.summary()
 
@@ -539,6 +555,7 @@ class ExpantionStitching(BaseStitchingModel):
         adam = optimizers.Adam(learning_rate=1e-3)
         model.compile(optimizer=adam, loss='mse', metrics=[PSNRLoss])
         if load_weights:
+            print(f"Loading model weights at {self.weight_path}...")
             model.load_weights(self.weight_path)
         model.summary()
 
@@ -590,6 +607,7 @@ class DenoisingAutoEncoderStitch(BaseStitchingModel):
         adam = optimizers.Adam(learning_rate=1e-3)
         model.compile(optimizer=adam, loss='mse', metrics=[PSNRLoss])
         if load_weights:
+            print(f"Loading model weights at {self.weight_path}...")
             model.load_weights(self.weight_path)
         model.summary()
 
@@ -632,6 +650,7 @@ class DistilledResNetStitch(BaseStitchingModel):
         model = Model(init, x)
         # dont compile yet
         if load_weights:
+            print(f"Loading model weights at {self.weight_path}...")
             model.load_weights(self.weight_path, by_name=True)
         model.summary()
 
@@ -675,7 +694,7 @@ class DistilledResNetStitch(BaseStitchingModel):
 class DeepDenoiseStitch(BaseStitchingModel):
 
     def __init__(self):
-        super(DeepDenoiseStitch, self).__init__("Distilled ResNet Stitching")
+        super(DeepDenoiseStitch, self).__init__("DeepDenoiseStitch")
 
         # Treat this model as a denoising auto encoder
         # Force the fit, evaluate and upscale methods to take special care about image shape
@@ -725,6 +744,7 @@ class DeepDenoiseStitch(BaseStitchingModel):
         adam = optimizers.Adam(learning_rate=1e-3)
         model.compile(optimizer=adam, loss='mse', metrics=[PSNRLoss])
         if load_weights:
+            print(f"Loading model weights at {self.weight_path}...")
             model.load_weights(self.weight_path)
         model.summary()
 

@@ -144,21 +144,21 @@ if __name__ == "__main__":
     """
 
     # sr = model_stitching.ImageStitchingModel()
-    # sr.stitch(cfg.base_folder + "/images/2/tk_0.png")
+    # sr.stitch(cfg.dataset_folder + "/images/2/tk_0.png")
 
     """
     Evaluate Image Stitching
     """
 
     # sr = model_stitching.ExpantionStitching()
-    # sr.stitch(cfg.base_folder + "/images/2/tk_0.png")
+    # sr.stitch(cfg.dataset_folder + "/images/2/tk_0.png")
 
     """
     Evaluate Image Stitching
     """
 
     # sr = model_stitching.DenoisingAutoEncoderStitch()
-    # sr.stitch(cfg.base_folder + "/images/2/tk_0.png")
+    # sr.stitch(cfg.dataset_folder + "/images/2/tk_0.png")
 
     """
     Evaluate Super Resolution on Set5/14

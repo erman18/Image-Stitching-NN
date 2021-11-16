@@ -236,9 +236,9 @@ def patchyfy(img, patch_shape, step=32):
     return np.lib.stride_tricks.as_strided(img, shape=shape, strides=strides)
 
 
-def make_raw_patches(x, patch_size, step=1, verbose=1):
+def make_raw_patches(x, patch_size, channels=3, step=1, verbose=1):
     '''x shape: (num_channels, rows, cols)'''
-    patches = patchify.patchify(x, (patch_size, patch_size, 3), step=step)
+    patches = patchify.patchify(x, (patch_size, patch_size, channels), step=step)
     return patches
 
 

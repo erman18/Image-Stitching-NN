@@ -21,15 +21,42 @@ except:
 
 class PanoWrapper:
 
-    def __init__(self, verbose=0):
+    def __init__(self, scale_factor=1.0, verbose=0):
         pano.init_config(cfg.pano_config_file)
         self.verbose = verbose
+        self.scale_factor = scale_factor
+        self.pano_stitch = None
+        self.pano_stitch_init = False
 
         if self.verbose:
             pano.print_config()
 
     def print_config(self):
         pano.print_config()
+
+    def is_pano_initialize(self):
+        return self.pano_stitch_init
+
+    def init_pano_stitcher(self, calib_files, multi_band_blend):
+        pano_stitch = pano.Stitcher(calib_files)
+        self.pano_stitch_init = False
+        self.pano_stitch = None
+        try:
+            mat = pano_stitch.build(self.scale_factor, multi_band_blend)
+            self.pano_stitch_init = True
+            self.pano_stitch = pano_stitch
+            return mat
+        except:
+            raise RuntimeError(f"Error: Failed to calibrate the input images {calib_files}")
+
+    def build_pano(self, img_paths, multi_band_blend):
+        if not self.pano_stitch: return None
+        mat = self.pano_stitch.build_from_new_images(img_paths, multi_band_blend)
+        return mat
+
+    def write_img(self, path, mat):
+        if not self.pano_stitch: return None
+        pano.write_img(path, mat)
 
     def pano_stitch_single_camera(self, img_paths: list, out_filename=None, calib_files=None, return_img=False,
                                   multi_band_blend=0):
@@ -46,42 +73,32 @@ class PanoWrapper:
         """
 
         if calib_files:
-            pano_stitch = pano.Stitcher(calib_files)
             try:
-                pano_stitch.build()
+                self.init_pano_stitcher(calib_files, multi_band_blend)
             except:
-                raise RuntimeError(f"Error: Failed to calibrate the input images {calib_files}")
+                # raise RuntimeError(f"Error: Failed to calibrate the input images {calib_files}")
+                if self.pano_stitch_init:
+                    self.init_pano_stitcher(img_paths, multi_band_blend)
 
-            mat = pano_stitch.build_from_new_images(img_paths, multi_band_blend)
-            if out_filename and multi_band_blend > 0:
-                pano.write_img(out_filename, mat)
+        if not self.pano_stitch_init:
+            print("Please, initialize the pano object by provide the calibration files.")
+            return None
 
-            if return_img:
-                p = np.array(mat, copy=False)
-                return p
+        mat = self.build_pano(img_paths, multi_band_blend)
 
-        else:
-            pano_stitch = pano.Stitcher(img_paths)
+        if out_filename and multi_band_blend > 0:
+            pano.write_img(out_filename, mat)
 
-            try:
-                pano_stitch.build()
-                mat = pano_stitch.build_from_new_images(img_paths, multi_band_blend)
+        if return_img:
+            p = np.array(mat, copy=False)
+            p[p < 0] = 0  # Replace negative values with zeros
+            p[p > 1] = 1  # Replace negative values with zeros
+            h, w, c = p.shape
+            X = np.zeros((1, h, w, abs(multi_band_blend) * 3))
 
-                if out_filename and multi_band_blend > 0:
-                    pano.write_img(out_filename, mat)
-
-                if return_img:
-                    p = np.array(mat, copy=False)
-                    p[p < 0] = 0  # Replace negative values with zeros
-                    p[p > 1] = 1  # Replace negative values with zeros
-                    h, w, c = p.shape
-                    X = np.zeros((1, h, w, 15))
-
-                    X[0, :, :, :c] = p
-                    print("********++++==> ", X.shape, " ~ ", p.dtype, ", multi_band_blend: ", multi_band_blend)
-                    return X
-            except:
-                raise RuntimeError(f"Error: Failed to calibrate the input images {img_paths}")
+            X[0, :, :, :c] = p
+            print("********++++==> ", X.shape, " ~ ", p.dtype, ", multi_band_blend: ", multi_band_blend)
+            return X
 
     def pano_stitch_multi_camera(self, img_pattern, nb_cameras, nb_images, out_dir=None,
                                  multi_band_blend=0, return_img=False):
@@ -106,25 +123,18 @@ class PanoWrapper:
         :return: Return a list of numpy array of images. list[numpy]
         """
 
-        pano_stitch = None
-        init_calib = False
-
         for img_id in range(nb_images):
 
             file_list = [img_pattern.format(i, img_id) for i in range(nb_cameras)]
 
             print(file_list)
-
-            pano_stitch = None
             try:
-                pano_stitch = pano.Stitcher(file_list)
-                pano_stitch.build()
-                init_calib = True
+                self.init_pano_stitcher(file_list, multi_band_blend)
                 break
             except:
                 print(f"Error: Cannot stitch image [{img_id}]")
 
-        if not init_calib:
+        if not self.pano_stitch_init:
             raise RuntimeError("Failed to find the projection parameters. Please add calibration "
                                "images in the same director as the images")
 
@@ -133,13 +143,13 @@ class PanoWrapper:
 
             file_list = [img_pattern.format(i, img_id) for i in range(nb_cameras)]
 
-            mat = pano_stitch.build_from_new_images(file_list, multi_band_blend)
+            mat = self.build_pano(file_list, multi_band_blend)
             print(f"Stitched image number: {img_id}/{total_img}")
 
             if return_img:
                 result_list.append(np.array(mat, copy=False))
 
-            if not out_dir and multi_band_blend>0:
+            if not out_dir and multi_band_blend > 0:
                 output_path = f"{out_dir}/{img_id:05d}.jpg"
                 pano.write_img(output_path, mat)
 

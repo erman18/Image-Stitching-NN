@@ -25,7 +25,7 @@ model_directory = {'DDStitch': DDStitch,
 parser = argparse.ArgumentParser()
 # parser.add_argument('--model_dir', default='experiments/base_model', help="Directory containing params.json")
 parser.add_argument('--model', default="DDStitch", help="Deep Denoise Stitching Model", type=str)
-parser.add_argument('--load_weights', default=False, type=bool)
+parser.add_argument('--load_weights', default=True, type=lambda x: (str(x).lower() in ['true', '1', 'yes']))
 parser.add_argument('--nb_epochs', default=10, type=int)
 parser.add_argument('--restore_file', default=None,
                     help="Optional, name of the file in --model_dir containing weights to reload before \
@@ -37,7 +37,7 @@ net = model_directory[args.model]
 model_name = args.model
 
 
-def train(height=128, width=128, nb_epochs=10, batch_size=32, save_arch=False, load_weights=True):
+def train(height, width, nb_epochs=10, batch_size=32, save_arch=False, load_weights=True):
 
     # stitch_model = model_stitching.NonLocalResNetStitching()
     stitch_model = net() # model_stitching.DeepDenoiseStitch()
@@ -64,5 +64,6 @@ if __name__ == "__main__":
     """
     Plot the models
     """
-    train(save_arch=True, nb_epochs=args.nb_epochs, batch_size=32, load_weights=args.load_weights)
+    train(height=cfg.patch_size, width=cfg.patch_size, save_arch=False, nb_epochs=args.nb_epochs,
+          batch_size=32, load_weights=args.load_weights)
     # save_model_plots()

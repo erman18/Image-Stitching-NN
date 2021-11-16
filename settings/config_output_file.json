@@ -1,0 +1,25 @@
+{
+    "total_dataset": 3,
+    "total_samples": 25435,
+    "0": {
+        "nb_imgs": 1,
+        "patchX": 82,
+        "patchY": 114,
+        "patchSizeX": 256,
+        "patchSizeY": 256
+    },
+    "1": {
+        "nb_imgs": 1,
+        "patchX": 108,
+        "patchY": 122,
+        "patchSizeX": 256,
+        "patchSizeY": 256
+    },
+    "2": {
+        "nb_imgs": 1,
+        "patchX": 41,
+        "patchY": 71,
+        "patchSizeX": 256,
+        "patchSizeY": 256
+    }
+}
