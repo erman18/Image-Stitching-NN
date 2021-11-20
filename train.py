@@ -20,7 +20,7 @@ model_directory = {'DDStitch': DDStitch,
                    'DPImgStitch': DPImgStitch,
                    'ExpStitch': ExpStitch,
                    'DAutoEncoderStitch': DAutoEncoderStitch,
-                }
+                   }
 
 parser = argparse.ArgumentParser()
 # parser.add_argument('--model_dir', default='experiments/base_model', help="Directory containing params.json")
@@ -38,9 +38,8 @@ model_name = args.model
 
 
 def train(height, width, nb_epochs=10, batch_size=32, save_arch=False, load_weights=True):
-
     # stitch_model = model_stitching.NonLocalResNetStitching()
-    stitch_model = net() # model_stitching.DeepDenoiseStitch()
+    stitch_model = net()  # model_stitching.DeepDenoiseStitch()
     stitch_model.create_model(height=height, width=width, load_weights=load_weights)
 
     if save_arch:
@@ -55,7 +54,7 @@ def save_model_plots():
         print(f"=> Model: {modname}")
         network = model_directory[modname]
         stitch_model = network()
-        stitch_model.create_model(height=128, width=128, load_weights=False)
+        stitch_model.create_model(height=256, width=256, load_weights=False)
         plot_model(stitch_model.model, to_file=f"architectures/model_img/{modname}.png", show_shapes=True,
                    show_layer_names=True)
 

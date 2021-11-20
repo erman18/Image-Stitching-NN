@@ -94,18 +94,17 @@ class PanoWrapper:
             p[p < 0] = 0  # Replace negative values with zeros
             p[p > 1] = 1  # Replace negative values with zeros
             h, w, c = p.shape
-            X = np.zeros((1, h, w, abs(multi_band_blend) * 3))
+            X = np.zeros((1, h, w, c))
 
             X[0, :, :, :c] = p
             print("********++++==> ", X.shape, " ~ ", p.dtype, ", multi_band_blend: ", multi_band_blend)
             return X
 
-    def pano_stitch_multi_camera(self, img_pattern, nb_cameras, nb_images, out_dir=None,
+    def pano_stitch_multi_camera(self, img_pattern, nb_cameras, total_img, nb_images, out_dir=None,
                                  multi_band_blend=0, return_img=False):
         """
             {
                 "img_pattern": "data_stitching/Terrace/Input/{:05d}/{:05d}.jpg",
-                "out_dir": "data_stitching/Terrace/Out2",
                 "nb_camera": 14,
                 "nb_images": 430,
             },
@@ -113,7 +112,8 @@ class PanoWrapper:
         :param img_pattern: Image pattern to build all camera image paths. It should contains an interger to index
                             the camera and the image of the camera (Mij).
                             ex: DIR/Input/{:05d}/{:05d}.jpg"
-        :param nb_cameras: total number of camera
+        :param nb_cameras: total number of cameras
+        :param total_img: total number of images
         :param nb_images: total number of images per camera to stitched
         :param out_dir: Output directory to save the output result. The
         :param multi_band_blend: -1 for merge blending, 0 for linear blending, k>0 for multi-band blending.
@@ -123,13 +123,14 @@ class PanoWrapper:
         :return: Return a list of numpy array of images. list[numpy]
         """
 
-        for img_id in range(nb_images):
+        for img_id in range(total_img):
 
             file_list = [img_pattern.format(i, img_id) for i in range(nb_cameras)]
 
             print(file_list)
             try:
                 self.init_pano_stitcher(file_list, multi_band_blend)
+                print(f"files: {file_list}")
                 break
             except:
                 print(f"Error: Cannot stitch image [{img_id}]")
@@ -139,12 +140,12 @@ class PanoWrapper:
                                "images in the same director as the images")
 
         result_list = []
-        for img_id in range(total_img):
+        for img_id in range(nb_images):
 
             file_list = [img_pattern.format(i, img_id) for i in range(nb_cameras)]
 
             mat = self.build_pano(file_list, multi_band_blend)
-            print(f"Stitched image number: {img_id}/{total_img}")
+            print(f"Stitched image number: {img_id}/{nb_images}")
 
             if return_img:
                 result_list.append(np.array(mat, copy=False))
