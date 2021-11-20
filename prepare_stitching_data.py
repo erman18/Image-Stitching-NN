@@ -16,6 +16,7 @@ import project_settings as cfg
 #import pylab as plt
 import panowrapper as pw
 from tqdm import tqdm
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 
 def dict_raise_on_duplicates(ordered_pairs):
@@ -213,16 +214,23 @@ class Dataset:
         self.increment_settings("nb_imgs", 1)
         self.dataset_settings["total_samples"] += img_patches.shape[0]*img_patches.shape[1]
 
-        for patchIdx in tqdm(range(img_patches.shape[0])):
-            for patchIdy in tqdm(range(img_patches.shape[1]), leave=False):
-                img_patch = img_patches[patchIdx, patchIdy, 0, :, :]
-                target_patch = target_patches[patchIdx, patchIdy, 0, :, :]
+        def __save_patch(patchIdx, patchIdy, pbar):
+            img_patch = img_patches[patchIdx, patchIdy, 0, :, :]
+            target_patch = target_patches[patchIdx, patchIdy, 0, :, :]
 
-                train_sample_obj = TrainingSample(datasetID=self.dataset_id, imgID=img_id, patchX=patchIdx,
-                                                  patchY=patchIdy, image_folder=cfg.image_folder)
+            train_sample_obj = TrainingSample(datasetID=self.dataset_id, imgID=img_id, patchX=patchIdx,
+                                              patchY=patchIdy, image_folder=cfg.image_folder)
 
-                train_sample_obj.save_sample(img_patch)
-                train_sample_obj.save_target(target_patch)
+            train_sample_obj.save_sample(img_patch)
+            train_sample_obj.save_target(target_patch)
+            pbar.update(1)
+
+        with tqdm(total=img_patches.shape[0]*img_patches.shape[1]) as pbar:
+            with ThreadPoolExecutor(max_workers=os.cpu_count()) as ex:
+
+                for patchIdx in range(img_patches.shape[0]):
+                    for patchIdy in range(img_patches.shape[1]):
+                        ex.submit(__save_patch, patchIdx, patchIdy, pbar)
 
         # Update config file each iteration
         write_json_file(cfg.config_img_output, data=self.dataset_settings)
