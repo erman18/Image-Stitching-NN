@@ -31,6 +31,7 @@ except:
     warnings.warn('Could not load opencv properly. This may affect the quality of output images.')
     _cv2_available = False
 
+
 # train_path = img_utils.output_path
 # validation_path = img_utils.validation_output_path
 # path_X = img_utils.output_path + "X/"
@@ -57,6 +58,9 @@ def psnr(y_true, y_pred):
 
     return -10. * np.log10(np.mean(np.square(y_pred - y_true)))
 
+
+def SSIMLoss(y_true, y_pred):
+    return tf.image.ssim(y_true, y_pred, max_val=1)
 #
 # def custom_loss(y_true, y_pred):
 #     dy0, dx0 = tf.image.image_gradients(y_true)
@@ -66,6 +70,13 @@ def psnr(y_true, y_pred):
 #     l0 = K.mean(K.square(y_pred - y_true))
 #
 #     return
+
+
+def custom_loss(y_true, y_pred):
+    dy_true, dx_true = tf.image.image_gradients(y_true)
+    dy_pred, dx_pred = tf.image.image_gradients(y_pred)
+    m_loss = K.mean(K.abs(dy_pred - dy_true) + K.abs(dx_pred - dx_true), axis=-1)
+    return m_loss
 
 
 class BaseStitchingModel(object):
@@ -346,12 +357,12 @@ class BaseStitchingModel(object):
         """
 
         filename = os.path.join(out_dir, "result_" + str(suffix) +
-                                    time.strftime("_%Y%m%d-%H%M%S") + ".jpg")
+                                time.strftime("_%Y%m%d-%H%M%S") + ".jpg")
         print("Output Result File: %s" % filename)
 
         # img_conv, h, w = self.__read_conv_img(img_path, scale_factor)
         h, w = img_conv.shape[1], img_conv.shape[2]
-        img_conv = img_conv.transpose((0, 2, 1, 3)) # .astype(np.float32)
+        img_conv = img_conv.transpose((0, 2, 1, 3))  # .astype(np.float32)
 
         print("Convolution image data point ready to be used: ", img_conv.shape)
 
@@ -360,7 +371,7 @@ class BaseStitchingModel(object):
 
         # Create prediction for image patches
         print("Starting the image stitching prediction")
-        result = model.predict(img_conv, verbose=verbose)
+        result = model.predict(img_conv, verbose=verbose, workers=2, use_multiprocessing=True)
 
         # Deprocess patches
         if verbose: print("De-processing images.")
@@ -460,7 +471,7 @@ class ResNetStitch(BaseStitchingModel):
         init = ip
 
         channel_dim = 1 if K.image_data_format() == 'channels_first' else -1
-        channels = init.shape[channel_dim] # init._keras_shape[channel_dim]
+        channels = init.shape[channel_dim]  # init._keras_shape[channel_dim]
 
         # x = Convolution2D(256, (3, 3), activation="relu", padding='same', name='sr_res_upconv1_%d' % id)(init)
         # x = SubPixelUpscaling(r=2, channels=self.n, name='sr_res_upscale1_%d' % id)(x)
@@ -636,7 +647,7 @@ class DistilledResNetStitch(BaseStitchingModel):
     def create_model(self, height=32, width=32, channels=3, nb_camera=5, load_weights=False):
         # init = super(DistilledResNetStich, self).create_model(height, width, channels, load_weights, batch_size)
         init = super(DistilledResNetStitch, self).create_model(height=height, width=width, channels=channels,
-                                                                    load_weights=load_weights)
+                                                               load_weights=load_weights)
 
         x0 = Convolution2D(self.n, (3, 3), activation='relu', padding='same', name='student_sr_res_conv1')(init)
 
@@ -710,7 +721,7 @@ class DeepDenoiseStitch(BaseStitchingModel):
         # Perform check that model input shape is divisible by 4
 
         init = super(DeepDenoiseStitch, self).create_model(height=height, width=width, channels=channels,
-                                                               load_weights=load_weights)
+                                                           load_weights=load_weights)
 
         c1 = Convolution2D(self.n1, (3, 3), activation='relu', padding='same')(init)
         c1 = Convolution2D(self.n1, (3, 3), activation='relu', padding='same')(c1)
