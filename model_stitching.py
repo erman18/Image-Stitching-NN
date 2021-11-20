@@ -32,12 +32,6 @@ except:
     _cv2_available = False
 
 
-# train_path = img_utils.output_path
-# validation_path = img_utils.validation_output_path
-# path_X = img_utils.output_path + "X/"
-# path_Y = img_utils.output_path + "y/"
-
-
 def PSNRLoss(y_true, y_pred):
     """
     PSNR is Peek Signal to Noise Ratio, which is similar to mean squared error.
@@ -440,7 +434,7 @@ class ResNetStitch(BaseStitchingModel):
         model = Model(init, x)
 
         adam = optimizers.Adam(learning_rate=1e-3)
-        model.compile(optimizer=adam, loss='mse', metrics=[PSNRLoss])
+        model.compile(optimizer=adam, loss='mse', metrics=[PSNRLoss, SSIMLoss])
         if load_weights:
             print(f"Loading model weights at {self.weight_path}...")
             model.load_weights(self.weight_path, by_name=True)
@@ -516,7 +510,7 @@ class ImageStitchingModel(BaseStitchingModel):
         model = Model(init, out)
 
         adam = optimizers.Adam(learning_rate=1e-3)
-        model.compile(optimizer=adam, loss='mse', metrics=[PSNRLoss])
+        model.compile(optimizer=adam, loss='mse', metrics=[PSNRLoss, SSIMLoss])
         if load_weights:
             print(f"Loading model weights at {self.weight_path}...")
             model.load_weights(self.weight_path)
@@ -564,7 +558,7 @@ class ExpantionStitching(BaseStitchingModel):
 
         model = Model(init, out)
         adam = optimizers.Adam(learning_rate=1e-3)
-        model.compile(optimizer=adam, loss='mse', metrics=[PSNRLoss])
+        model.compile(optimizer=adam, loss='mse', metrics=[PSNRLoss, SSIMLoss])
         if load_weights:
             print(f"Loading model weights at {self.weight_path}...")
             model.load_weights(self.weight_path)
@@ -616,7 +610,7 @@ class DenoisingAutoEncoderStitch(BaseStitchingModel):
 
         model = Model(init, decoded)
         adam = optimizers.Adam(learning_rate=1e-3)
-        model.compile(optimizer=adam, loss='mse', metrics=[PSNRLoss])
+        model.compile(optimizer=adam, loss='mse', metrics=[PSNRLoss, SSIMLoss])
         if load_weights:
             print(f"Loading model weights at {self.weight_path}...")
             model.load_weights(self.weight_path)
@@ -753,7 +747,7 @@ class DeepDenoiseStitch(BaseStitchingModel):
 
         model = Model(init, decoded)
         adam = optimizers.Adam(learning_rate=1e-3)
-        model.compile(optimizer=adam, loss='mse', metrics=[PSNRLoss])
+        model.compile(optimizer=adam, loss='mse', metrics=[PSNRLoss, SSIMLoss])
         if load_weights:
             print(f"Loading model weights at {self.weight_path}...")
             model.load_weights(self.weight_path)

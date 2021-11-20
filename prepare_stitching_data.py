@@ -112,7 +112,7 @@ class Dataset:
         :param total_img: total number of images for this dataset
         :param img_pattern: image pattern to retrieve image files on disk. This pattern is
             a python f-string and should contain the camera id and the image id fields
-            Example: /media/sf_Data/data_stitching/Terrace/Input/{camID:05d}/{imgID:05d}.jpg
+            Example: Terrace/Input/{camID:05d}/{imgID:05d}.jpg
         :param image_folder: Training folder to store images
         :param data_settings: Default: None. Dictionary of the data setting for this dataset
         """

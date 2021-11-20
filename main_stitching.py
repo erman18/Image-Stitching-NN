@@ -12,6 +12,7 @@ import panowrapper as pw
 
 import math
 import cv2
+import project_settings as cfg
 
 
 def calculate_psnr(img1, img2):
@@ -159,7 +160,7 @@ if __name__ == "__main__":
 
     # print(img_merge.shape)
     # model.stitch(files, scale_factor=args.scale_factor, suffix=model_type)
-    outdir = "/media/sf_Data/data_stitching/deepstitch-dataset/out_result" if args.outdir is None else args.outdir
+    outdir = f"{cfg.dataset_folder}/out_result" if args.outdir is None else args.outdir
 
     import time
     start_time = time.time()
