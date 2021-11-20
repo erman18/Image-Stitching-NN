@@ -146,8 +146,7 @@ if __name__ == "__main__":
         img_mbb = img_mbb.astype(np.float32) * 255.
         img_mbb = np.clip(img_mbb, 0, 255).astype('uint8')
         img_mbb = img_mbb[0, :, :, :]
-
-    print(f"=> Shape im_merge: {img_merge.shape}, shape of img_mbb: {img_mbb.shape}")
+        print(f"=> Shape im_merge: {img_merge.shape}, shape of img_mbb: {img_mbb.shape}")
 
     if model_type == "ddis":
         # Pad image with zeros to the nearest power of 2
@@ -156,8 +155,8 @@ if __name__ == "__main__":
         img_merge = np.pad(img_merge, ((0, 0), (0, h), (0, w), (0, 0)), mode='constant')
         if args.compare_result:
             img_mbb = np.pad(img_mbb, ((0, h), (0, w), (0, 0)), mode='constant')
+            print(f"=> New Shape im_merge: {img_merge.shape}, shape of img_mbb: {img_mbb.shape}")
 
-    print(f"=> New Shape im_merge: {img_merge.shape}, shape of img_mbb: {img_mbb.shape}")
     # print(img_merge.shape)
     # model.stitch(files, scale_factor=args.scale_factor, suffix=model_type)
     outdir = "/media/sf_Data/data_stitching/deepstitch-dataset/out_result" if args.outdir is None else args.outdir
