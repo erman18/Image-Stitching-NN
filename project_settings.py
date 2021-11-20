@@ -3,7 +3,7 @@ import logging
 # create formatter
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logging_format = '%(asctime)s: %(levelname)s:%(message)s'
-dataset_folder = "/media/sf_Data/data_stitching/deepstitch-dataset"
+dataset_folder = "/home/smrtsyslab/projects/deepstitch-dataset"
 image_folder = f"{dataset_folder}/training_data"
 
 project_dir = "."  # "/home/erman/projects/Image-Stitching-NN"

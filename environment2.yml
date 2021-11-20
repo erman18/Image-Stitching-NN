@@ -3,8 +3,7 @@ channels:
   - conda-forge
   - defaults
 dependencies:
-  - tensorflow=2.5.0
-  - tensorboard=2.5.0
+  - tensorflow-gpu==2.4.1
   - keras=2.4.3
   - imageio=2.9.0
   - python=3.8
@@ -14,6 +13,7 @@ dependencies:
   - py-opencv
   - scikit-learn
   - pydot
+  - python=3.8.8
   - python-graphviz
   - pip
   - pip:

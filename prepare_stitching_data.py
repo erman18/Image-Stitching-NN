@@ -13,7 +13,7 @@ import img_utils
 import project_settings as cfg
 
 # sys.path.append(cfg.pano_libs_dir)
-import pylab as plt
+#import pylab as plt
 import panowrapper as pw
 from tqdm import tqdm
 
