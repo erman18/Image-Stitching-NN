@@ -15,9 +15,9 @@ LIB_DIR=$DIRECTORY/libs
 #SCALE_FACTOR=3
 
 # Data Test 3
-IMGDIR=/media/sf_Data/data_stitching/Street/Calibration
-OUTDIR=/media/sf_Data/data_stitching/deepstitch-dataset/out_result/
-SCALE_FACTOR=3
+# IMGDIR=/home/smrtsyslab/projects/deepstitch-dataset/raw_data/Street/Calibration
+# OUTDIR=/home/smrtsyslab/projects/deepstitch-dataset/out_result/
+# SCALE_FACTOR=3
 
 ## Data Test 4
 #IMGDIR=/media/sf_Data/data_stitching/Terrace/Calibration
@@ -29,7 +29,12 @@ SCALE_FACTOR=3
 #OUTDIR=/media/sf_Data/data_stitching/deepstitch-dataset/out_result/
 #SCALE_FACTOR=3
 
+# Data Test 3
+IMGDIR=/home/smrtsyslab/projects/deepstitch-dataset/raw_data/Windmills/Calibration
+OUTDIR=/home/smrtsyslab/projects/deepstitch-dataset/out_result/
+SCALE_FACTOR=3
+
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$LIB_DIR/pano &&
 # Model: is, eis, dis, ddis, rnis, distilled_rnis (not yet trained)
-python main_stitching.py --imgdir $IMGDIR --outdir $OUTDIR --model ddis --scale_factor=$SCALE_FACTOR
+python main_stitching.py --imgdir $IMGDIR --outdir $OUTDIR --model rnis --scale_factor=$SCALE_FACTOR
 

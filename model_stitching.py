@@ -23,6 +23,10 @@ import glob
 import time
 import warnings
 
+gpus = tf.config.experimental.list_physical_devices('GPU')
+for gpu in gpus:
+  tf.config.experimental.set_memory_growth(gpu, True)
+
 try:
     import cv2
 
@@ -384,14 +388,14 @@ class BaseStitchingModel(object):
 
         if verbose: print("\nCompleted De-processing image.")
 
-        if return_image:
-            # Return the image without saving. Useful for testing images.
-            return result
-
         if verbose: print("Saving image.", filename)
         # Convert into BGR to save with OpenCV
         result = cv2.cvtColor(result, cv2.COLOR_RGB2BGR)
         cv2.imwrite(filename, result)
+
+        if return_image:
+            # Return the image without saving. Useful for testing images.
+            return result
 
 
 class ResNetStitch(BaseStitchingModel):

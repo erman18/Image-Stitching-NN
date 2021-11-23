@@ -27,6 +27,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--model', default="DDStitch", help="Deep Denoise Stitching Model", type=str)
 parser.add_argument('--load_weights', default=True, type=lambda x: (str(x).lower() in ['true', '1', 'yes']))
 parser.add_argument('--nb_epochs', default=10, type=int)
+parser.add_argument('--batch_size', default=32, type=int)
 parser.add_argument('--restore_file', default=None,
                     help="Optional, name of the file in --model_dir containing weights to reload before \
                     training")  # 'best' or 'train'
@@ -64,5 +65,5 @@ if __name__ == "__main__":
     Plot the models
     """
     train(height=cfg.patch_size, width=cfg.patch_size, save_arch=False, nb_epochs=args.nb_epochs,
-          batch_size=32, load_weights=args.load_weights)
+          batch_size=args.batch_size, load_weights=args.load_weights)
     # save_model_plots()
