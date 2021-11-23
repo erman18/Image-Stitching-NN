@@ -73,6 +73,8 @@ def SSIMLoss(y_true, y_pred):
 def custom_loss(y_true, y_pred):
     dy_true, dx_true = tf.image.image_gradients(y_true)
     dy_pred, dx_pred = tf.image.image_gradients(y_pred)
+
+    # Use convolution to compute the correlation between patches.
     m_loss = K.mean(K.abs(dy_pred - dy_true) + K.abs(dx_pred - dx_true), axis=-1)
     return m_loss
 
@@ -305,13 +307,12 @@ class BaseStitchingModel(object):
             result = cv2.pyrDown(result)
 
         if verbose: print("\nCompleted De-processing image.")
+        if verbose: print("Saving image.", filename)
+        cv2.imwrite(filename, result)
 
         if return_image:
             # Return the image without saving. Useful for testing images.
             return result
-
-        if verbose: print("Saving image.", filename)
-        cv2.imwrite(filename, result)
 
     def __read_conv_img(self, img_paths: list, scaled_factor):
 
