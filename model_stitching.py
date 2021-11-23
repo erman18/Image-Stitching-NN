@@ -303,13 +303,12 @@ class BaseStitchingModel(object):
             result = cv2.pyrDown(result)
 
         if verbose: print("\nCompleted De-processing image.")
+        if verbose: print("Saving image.", filename)
+        cv2.imwrite(filename, result)
 
         if return_image:
             # Return the image without saving. Useful for testing images.
             return result
-
-        if verbose: print("Saving image.", filename)
-        cv2.imwrite(filename, result)
 
     def __read_conv_img(self, img_paths: list, scaled_factor):
 
@@ -386,14 +385,14 @@ class BaseStitchingModel(object):
 
         if verbose: print("\nCompleted De-processing image.")
 
-        if return_image:
-            # Return the image without saving. Useful for testing images.
-            return result
-
         if verbose: print("Saving image.", filename)
         # Convert into BGR to save with OpenCV
         result = cv2.cvtColor(result, cv2.COLOR_RGB2BGR)
         cv2.imwrite(filename, result)
+
+        if return_image:
+            # Return the image without saving. Useful for testing images.
+            return result
 
 
 class ResNetStitch(BaseStitchingModel):
