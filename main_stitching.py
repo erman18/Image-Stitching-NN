@@ -73,6 +73,12 @@ parser = argparse.ArgumentParser(description="Up-Scales an image using Image Sup
 parser.add_argument("imgpath", type=str, nargs="*", help="Path to input image")
 parser.add_argument("--imgdir", type=str, default=None, help="Image directory")
 parser.add_argument("--outdir", type=str, default=None, help="Output Result directory")
+parser.add_argument("--calib_dir", type=str, default=None, help="Camera Calibration directory that contains images")
+parser.add_argument("--calib_pattern", type=str, default=None,
+                    help="Calibration images pattern. Should contains the camera id and image id."
+                         "Ex: 'DIR/Input/{camID:05d}/{imgID:05d}.jpg'")
+parser.add_argument("-nbc", "--nb_cameras", type=int, default=0, help="Total number of cameras")
+parser.add_argument("-nbi", "--nb_images", type=int, default=0, help="Total number of images")
 parser.add_argument('--compare_result', default=True, type=lambda x: (str(x).lower() in ['true', '1', 'yes']))
 parser.add_argument("--scale_factor", type=float, default=1.0,
                     help="Input image scale factor [to be divide]."
@@ -134,6 +140,14 @@ if __name__ == "__main__":
         model = model_stitching.ImageStitchingModel()
 
     panow = pw.PanoWrapper(scale_factor=args.scale_factor)
+
+    # initialize pano stitch
+    if args.calib_pattern is not None and args.nb_cameras and args.nb_images:
+        panow.init_pano_from_dir(args.calib_pattern, args.nb_cameras, args.nb_images)
+
+    if not panow.is_pano_initialize() and args.calib_dir is not None:
+        panow.init_pano_stitcher(args.calib_dir, multi_band_blend=0)
+
     img_merge = panow.pano_stitch_single_camera(files, calib_files=files, multi_band_blend=-5, return_img=True)
     # panow.print_config()
     if img_merge is None:
@@ -142,6 +156,7 @@ if __name__ == "__main__":
         # panow.pano_stitch_multi_camera(files_pattern, nb_cameras=5, total_img=400, nb_images=1)
         sys.exit()
 
+    img_mbb = None
     if args.compare_result:
         img_mbb = panow.pano_stitch_single_camera(files, calib_files=None, multi_band_blend=20, return_img=True)
         img_mbb = img_mbb.astype(np.float32) * 255.

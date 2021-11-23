@@ -69,6 +69,8 @@ def SSIMLoss(y_true, y_pred):
 def custom_loss(y_true, y_pred):
     dy_true, dx_true = tf.image.image_gradients(y_true)
     dy_pred, dx_pred = tf.image.image_gradients(y_pred)
+
+    # Use convolution to compute the correlation between patches.
     m_loss = K.mean(K.abs(dy_pred - dy_true) + K.abs(dx_pred - dx_true), axis=-1)
     return m_loss
 
