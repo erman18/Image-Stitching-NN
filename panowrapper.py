@@ -27,6 +27,7 @@ class PanoWrapper:
         self.scale_factor = scale_factor
         self.pano_stitch = None
         self.pano_stitch_init = False
+        # help(pano)
 
         if self.verbose:
             pano.print_config()
@@ -38,6 +39,11 @@ class PanoWrapper:
         return self.pano_stitch_init
 
     def init_pano_stitcher(self, calib_files, multi_band_blend):
+
+        for img_path in calib_files:
+            if not os.path.isfile(img_path):
+                raise ValueError(f"Error: Image file {img_path} does not exists")
+
         pano_stitch = pano.Stitcher(calib_files)
         self.pano_stitch_init = False
         self.pano_stitch = None
@@ -64,17 +70,20 @@ class PanoWrapper:
         self.pano_stitch = None
         multi_band_blend = 0
 
-        for img_id in range(nb_images):
+        for img_id in range(0, nb_images):
 
             file_list = [img_pattern.format(camID=i, imgID=img_id) for i in range(nb_cameras)]
 
-            # print(file_list)
             try:
                 self.init_pano_stitcher(file_list, multi_band_blend)
                 print(f"files: {file_list}")
                 break
+            except ValueError:
+                print(f"Error: Please check image exists to the specified location - {file_list}")
+                raise
             except:
                 print(f"Error: Cannot stitch image [{img_id}]")
+                time.sleep(0.05)
 
         if not self.pano_stitch_init:
             raise RuntimeError("Failed to find the projection parameters. Please add calibration "
@@ -82,6 +91,9 @@ class PanoWrapper:
 
     def build_pano(self, img_paths, multi_band_blend):
         if not self.pano_stitch: return None
+        for img_path in img_paths:
+            if not os.path.isfile(img_path):
+                raise ValueError(f"Error: Image file {img_path} does not exists")
         mat = self.pano_stitch.build_from_new_images(img_paths, multi_band_blend)
         return mat
 

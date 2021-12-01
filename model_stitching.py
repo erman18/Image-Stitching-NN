@@ -358,6 +358,7 @@ class BaseStitchingModel(object):
         filename = os.path.join(out_dir, "result_" + str(suffix) +
                                 time.strftime("_%Y%m%d-%H%M%S") + ".jpg")
         print("Output Result File: %s" % filename)
+        os.makedirs(out_dir, exist_ok=True)
 
         # img_conv, h, w = self.__read_conv_img(img_path, scale_factor)
         h, w = img_conv.shape[1], img_conv.shape[2]
