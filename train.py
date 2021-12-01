@@ -5,7 +5,7 @@ import argparse
 from keras.utils.vis_utils import plot_model
 import model_stitching
 import img_utils
-import project_settings as cfg
+import constant as cfg
 
 from model_stitching import DeepDenoiseStitch as DDStitch
 from model_stitching import DistilledResNetStitch as DResStitch

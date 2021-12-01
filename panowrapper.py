@@ -6,7 +6,7 @@ import time
 
 import numpy as np
 
-import project_settings as cfg
+import constant as cfg
 import cv2
 
 sys.path.append(cfg.pano_libs_dir)

@@ -5,7 +5,7 @@ import tensorflow.keras as keras
 import tensorflow as tf
 
 import prepare_stitching_data as psd
-import project_settings as cfg
+import constant as cfg
 import cv2
 import gc
 

@@ -12,7 +12,7 @@ import panowrapper as pw
 
 import math
 import cv2
-import project_settings as cfg
+import constant as cfg
 import time
 
 
@@ -217,7 +217,7 @@ if __name__ == "__main__":
 
     if args.input_pattern is not None and args.nb_stitch_images:
         for img_id in range(args.nb_stitch_images):
-            
+
             file_list = [args.input_pattern.format(camID=i, imgID=img_id) for i in range(args.nb_cameras)]
             stitch(file_list, model_type=model_type, outdir=m_outdir, compare_result=args.compare_result, scale_factor=args.scale_factor)
 

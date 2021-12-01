@@ -15,7 +15,7 @@ import img_utils
 from data_generator import read_img_dataset  # , DataGenerator, image_stitching_generator
 import prepare_stitching_data as psd
 from sklearn.model_selection import train_test_split
-import project_settings as cfg
+import constant as cfg
 
 import numpy as np
 import os

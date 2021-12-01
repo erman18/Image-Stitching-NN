@@ -10,7 +10,7 @@ import numpy as np
 from cv2 import imwrite, imread
 
 import img_utils
-import project_settings as cfg
+import constant as cfg
 
 # sys.path.append(cfg.pano_libs_dir)
 #import pylab as plt
