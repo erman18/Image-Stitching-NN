@@ -160,45 +160,15 @@ class DataGenerator(keras.utils.Sequence):
         return self.__img_path_generation(self.list_ids)
 
 
-def load_data_sample(img_paths, dim, n_channels, training_folder):
-
-    dataset_id, patchx_id, patchy_id, img_id, total_imgs = img_paths
-
-    ts = psd.TrainingSample(datasetID=dataset_id, imgID=img_id, patchX=patchx_id,
-                            patchY=patchy_id, image_folder=training_folder.decode("utf-8"))
-    X = ts.load_sample()
-    y = ts.load_target()
-
-    return X, y
-
-
-# @tf.function
-def read_img_dataset(list_ids, config_data, callee, batch_size=32, dim=(256, 256),
-                     n_channels=15, shuffle=True, seed=None, buffer_size=tf.data.AUTOTUNE):
-
-    print("callee: %s" % callee, len(list_ids))
-    data_gen = DataGenerator(list_ids, config_data, dim=dim)
-    list_paths = data_gen.generate_img_path()
-
-    dataset = tf.data.Dataset.from_tensor_slices(list_paths)
-    # dataset = dataset.map(load_image)
-
-    # dataset = dataset.map(lambda x: load_image(x, dim, n_channels, psd.training_folder))
-
-    dataset = dataset.map(lambda item1, item2=dim, item3=n_channels, item4=str(cfg.image_folder): tf.numpy_function(
-        load_data_sample, [item1, item2, item3, item4], [tf.float32, tf.float32]), num_parallel_calls=tf.data.AUTOTUNE)  #
-
-    return dataset.repeat(1).batch(batch_size=batch_size).prefetch(buffer_size)#.cache()
-
-
 ## Loading function for self-supervised training
 def un_load_data_sample(img_paths, dim, n_channels, training_folder):
 
     dataset_id, patchx_id, patchy_id, img_id, total_imgs = img_paths
 
     ts = psd.TrainingSample(datasetID=dataset_id, imgID=img_id, patchX=patchx_id,
-                            patchY=patchy_id, image_folder=training_folder)
+                            patchY=patchy_id, image_folder=training_folder.decode("utf-8"))
     X = ts.load_sample()
+    # print("===================================", X.shape)
 
     return X, X
 
@@ -206,7 +176,7 @@ def un_load_data_sample(img_paths, dim, n_channels, training_folder):
 ## Loading function for self-supervised training
 # @tf.function
 def un_read_img_dataset(list_ids, config_data, callee, batch_size=32, dim=(256, 256),
-                     n_channels=15, shuffle=True, seed=None, buffer_size=2):
+                     n_channels=15, shuffle=True, seed=None, buffer_size=tf.data.AUTOTUNE):
 
     print("callee: %s" % callee, len(list_ids))
     data_gen = DataGenerator(list_ids, config_data, dim=dim)
@@ -215,7 +185,7 @@ def un_read_img_dataset(list_ids, config_data, callee, batch_size=32, dim=(256, 
     dataset = tf.data.Dataset.from_tensor_slices(list_paths)
 
     dataset = dataset.map(lambda item1, item2=dim, item3=n_channels, item4=str(cfg.image_folder): tf.numpy_function(
-        un_load_data_sample, [item1, item2, item3, item4], [tf.float32, tf.float32]))  #
+        un_load_data_sample, [item1, item2, item3, item4], [tf.float32, tf.float32]), num_parallel_calls=tf.data.AUTOTUNE)  #
 
     return dataset.repeat(1).batch(batch_size=batch_size).prefetch(buffer_size)
 
@@ -224,32 +194,10 @@ if __name__ == "__main__":
 
     config_data = psd.read_json_file(cfg.config_img_output)
 
-    d = DataGenerator([], config_data, dim=(cfg.patch_size, cfg.patch_size))
-    # for i in range(12387):
-    #     d.test_get_scene_patch(i)
-    # print(d.test_get_scene_patch(45 * 15))
-
-    # X, y = d.test_data_generator([0, 23, 54, 2050])
-    # print("x.shape: ", X.shape)
-    # print("y.shape: ", y.shape)
-
-    d.test_data_generator([*range(config_data["total_samples"])])
-
-    print("==> For consistency in the total_sample")
-    print(f'total_samples: {config_data["total_samples"]}')
-
-    # print("Len X: ", len(X), X)
-
-    # from sklearn.model_selection import train_test_split
-    #
-    # x = np.arange(12387)
-    # x_train, x_test = train_test_split(x, test_size=0.20)
-    # print(len(x_test))
-    # print(len(x_train))
-
     d1 = DataGenerator([*range(config_data["total_samples"])], config_data, dim=(cfg.patch_size, cfg.patch_size))
     
     list_paths = d1.generate_img_path()
+    print("------------------------------------------")
     print(list_paths[0:2])
     X, Y = un_load_data_sample(list_paths[2], dim=None, n_channels=None, training_folder=str(cfg.image_folder))
     print(X.shape, " - ", Y.shape)

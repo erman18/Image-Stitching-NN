@@ -3,8 +3,6 @@ from __future__ import print_function, division
 import argparse
 
 from keras.utils.vis_utils import plot_model
-import model_stitching
-import img_utils
 import constant as cfg
 
 from model_stitching import DeepDenoiseStitch as DDStitch
@@ -13,6 +11,7 @@ from model_stitching import ResNetStitch as ResNetStitch
 from model_stitching import ImageStitchingModel as DPImgStitch
 from model_stitching import ExpantionStitching as ExpStitch
 from model_stitching import DenoisingAutoEncoderStitch as DAutoEncoderStitch
+from SSL_models import ResNetStitch as UnResNetStitch
 
 model_directory = {'DDStitch': DDStitch,
                    'DResStitch': DResStitch,
@@ -20,12 +19,14 @@ model_directory = {'DDStitch': DDStitch,
                    'DPImgStitch': DPImgStitch,
                    'ExpStitch': ExpStitch,
                    'DAutoEncoderStitch': DAutoEncoderStitch,
+                   'UnResNetStitch': UnResNetStitch,
                    }
 
 parser = argparse.ArgumentParser()
 # parser.add_argument('--model_dir', default='experiments/base_model', help="Directory containing params.json")
 parser.add_argument('--model', default="DDStitch", help="Deep Denoise Stitching Model", type=str)
 parser.add_argument('--load_weights', default=True, type=lambda x: (str(x).lower() in ['true', '1', 'yes']))
+parser.add_argument('--save_model_img', default=True, type=lambda x: (str(x).lower() in ['true', '1', 'yes']))
 parser.add_argument('--nb_epochs', default=10, type=int)
 parser.add_argument('--batch_size', default=32, type=int)
 parser.add_argument('--restore_file', default=None,
@@ -47,6 +48,7 @@ def train(height, width, nb_epochs=10, batch_size=32, save_arch=False, load_weig
         plot_model(stitch_model.model, to_file=f"architectures/model_img/{model_name}.png", show_shapes=True,
                    show_layer_names=True)
 
+
     stitch_model.fit(nb_epochs=nb_epochs, batch_size=batch_size)
 
 
@@ -64,6 +66,6 @@ if __name__ == "__main__":
     """
     Plot the models
     """
-    train(height=cfg.patch_size, width=cfg.patch_size, save_arch=False, nb_epochs=args.nb_epochs,
+    train(height=cfg.patch_size, width=cfg.patch_size, save_arch=args.save_model_img, nb_epochs=args.nb_epochs,
           batch_size=args.batch_size, load_weights=args.load_weights)
     # save_model_plots()
