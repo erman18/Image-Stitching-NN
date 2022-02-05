@@ -7,13 +7,13 @@ import sys
 import time
 
 import numpy as np
-from cv2 import imwrite, imread
+# from cv2 import imwrite, imread
 
 import img_utils
-import project_settings as cfg
+import constant as cfg
 
 # sys.path.append(cfg.pano_libs_dir)
-import pylab as plt
+#import pylab as plt
 import panowrapper as pw
 from tqdm import tqdm
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -171,6 +171,8 @@ class Dataset:
 
         panow = pw.PanoWrapper()
 
+        # Trying to find the optimal projection matrix
+        # by initializing the pano stitcher object 
         for img_id in range(self.total_img):
 
             file_list = [self.img_pattern.format(camID=i, imgID=img_id) for i in range(self.nb_cameras)]
@@ -257,93 +259,6 @@ def prepare_data_live():
         ds = Dataset(datasetID, total_img, nb_cameras, nb_img_generate, img_pattern, image_folder,
                      config_output_file)
         ds.generate_dataset()
-
-        # config_output_file[str(datasetID)] = ds.data_settings
-        # config_output_file["total_samples"] += (ds.data_settings["nb_imgs"]
-        #                                                         *ds.data_settings["patchX"]
-        #                                                         *ds.data_settings["patchY"])
-
-        # Update config file each iteration
-        # write_json_file(cfg.config_img_output, data=data_file_settings)
-
-
-# def prepare_data(step=cfg.patch_step, patch_size=cfg.patch_size, invert_white=False):
-#     """Prepare data set for image stitching"""
-#     os.makedirs(training_folder, exist_ok=True)
-#
-#     # Read all image in the folder (Required python >= 3.5)
-#     image_dir = [f.path for f in os.scandir(dataset_folder) if f.is_dir()]
-#     # target_dir = [f.path for f in os.scandir(dataset_folder) if f.is_dir()]
-#
-#     print(image_dir)
-#
-#     data_file_settings = read_json_file(config_file)
-#     data_file_settings["total_dataset"] = len(image_dir)
-#     data_file_settings["total_samples"] = 0
-#
-#     for cam_idx, cam_dir in enumerate(image_dir):
-#         print(cam_dir)
-#
-#         target_file = target_folder + "/" + os.path.basename(cam_dir) + ".png"
-#         print(target_file)
-#
-#         files = []
-#         exts = ["*.jpg", "*.jpeg", "*.png", "*.bmp", "*.gif"]
-#         for ext in exts:
-#             files.extend(glob.glob(os.path.join(cam_dir, ext)))
-#
-#         # data_settings[str(cam_idx)] = {}
-#         # patch parameters
-#         # step = 32
-#         # patch_size = 128
-#
-#         for img_idx, img_path in enumerate(files):
-#             img = imread(img_path)  # pilmode='RGB'
-#             if invert_white: img[np.where((img == [255, 255, 255]).all(axis=2))] = [0, 0, 0]
-#
-#             img_patches = img_utils.make_raw_patches(img, step=step, patch_size=patch_size, verbose=1)
-#
-#             print(img_patches.shape)
-#             img_dir = training_folder + "/X/camID%d/imgID%d" % (cam_idx, img_idx)
-#             print("======>", img_dir)
-#
-#             imwrite(img_dir + ".png", img)
-#
-#             os.makedirs(img_dir, exist_ok=True)
-#             for patchIdx in range(img_patches.shape[0]):
-#                 for patchIdy in range(img_patches.shape[1]):
-#                     img_patch = img_patches[patchIdx, patchIdy, 0, :, :]
-#
-#                     imwrite(img_dir + "/patchID_%d_%d.png" % (patchIdx, patchIdy), img_patch)
-#
-#             data_file_settings[str(cam_idx)] = {
-#                 "nbImg_per_scene": len(files),
-#                 "nb_imgs": len(files),
-#                 "patchX": img_patches.shape[0],
-#                 "patchY": img_patches.shape[1],
-#                 "patchSizeX": img_patches.shape[3],
-#                 "patchSizeY": img_patches.shape[4],
-#             }
-#
-#         data_file_settings["total_samples"] += data_file_settings[str(cam_idx)]["patchX"] * \
-#                                                data_file_settings[str(cam_idx)]["patchY"]
-#
-#         target_img = imread(target_file)  # pilmode='RGB'
-#         target_patches = img_utils.make_raw_patches(target_img, step=step, patch_size=patch_size, verbose=1)
-#         target_out_dir = training_folder + "/Y/camID%d" % cam_idx
-#         os.makedirs(target_out_dir, exist_ok=True)
-#         for patchIdx in range(target_patches.shape[0]):
-#             for patchIdy in range(target_patches.shape[1]):
-#                 img_patch = target_patches[patchIdx, patchIdy, 0, :, :]
-#
-#                 imwrite(target_out_dir + "/patchID_%d_%d.png" % (patchIdx, patchIdy), img_patch)
-#
-#     print(data_file_settings)
-#     # print(data_settings.items())
-#     print(data_file_settings.keys())
-#     # Save configuration data
-#     write_json_file(config_file, data=data_file_settings)
-
 
 if __name__ == "__main__":
     prepare_data_live()

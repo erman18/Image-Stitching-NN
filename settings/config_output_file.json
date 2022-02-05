@@ -1,24 +1,45 @@
 {
-    "total_dataset": 3,
-    "total_samples": 25435,
+    "total_dataset": 6,
+    "total_samples": 123273,
     "0": {
-        "nb_imgs": 1,
-        "patchX": 82,
-        "patchY": 114,
-        "patchSizeX": 256,
-        "patchSizeY": 256
-    },
-    "1": {
-        "nb_imgs": 1,
-        "patchX": 108,
+        "nb_imgs": 3,
+        "patchX": 80,
         "patchY": 122,
         "patchSizeX": 256,
         "patchSizeY": 256
     },
+    "1": {
+        "nb_imgs": 2,
+        "patchX": 109,
+        "patchY": 121,
+        "patchSizeX": 256,
+        "patchSizeY": 256
+    },
     "2": {
-        "nb_imgs": 1,
+        "nb_imgs": 3,
         "patchX": 41,
         "patchY": 71,
+        "patchSizeX": 256,
+        "patchSizeY": 256
+    },
+    "3": {
+        "nb_imgs": 3,
+        "patchX": 59,
+        "patchY": 114,
+        "patchSizeX": 256,
+        "patchSizeY": 256
+    },
+    "4": {
+        "nb_imgs": 2,
+        "patchX": 107,
+        "patchY": 121,
+        "patchSizeX": 256,
+        "patchSizeY": 256
+    },
+    "5": {
+        "nb_imgs": 3,
+        "patchX": 122,
+        "patchY": 35,
         "patchSizeX": 256,
         "patchSizeY": 256
     }

@@ -1,30 +1,44 @@
 {
   "0": {
-    "img_pattern": "/media/sf_Data/data_stitching/Terrace/Input/{camID:05d}/{imgID:05d}.jpg",
+    "img_pattern": "/home/smrtsyslab/projects/deepstitch-dataset/raw_data/Terrace/Input/{camID:05d}/{imgID:05d}.jpg",
     "nb_cameras": 14,
     "calib_img_id": 0,
-    "nb_img_generate": 1,
+    "nb_img_generate": 3,
     "total_img": 430
   },
    "1": {
-    "img_pattern": "/media/sf_Data/data_stitching/Malibu/Input/{camID:05d}/{imgID:05d}.jpg",
+    "img_pattern": "/home/smrtsyslab/projects/deepstitch-dataset/raw_data/Malibu/Input/{camID:05d}/{imgID:05d}.jpg",
     "nb_cameras": 5,
     "calib_img_id": 0,
     "nb_img_generate": 2,
     "total_img": 400
   },
    "2": {
-    "img_pattern": "/media/sf_Data/data_stitching/Airplanes/Input/{camID:05d}/{imgID:05d}.jpg",
+    "img_pattern": "/home/smrtsyslab/projects/deepstitch-dataset/raw_data/Airplanes/Input/{camID:05d}/{imgID:05d}.jpg",
     "nb_cameras": 5,
     "calib_img_id": 0,
-    "nb_img_generate": 1,
+    "nb_img_generate": 3,
     "total_img": 599
   },
    "3": {
-    "img_pattern": "/media/sf_Data/data_stitching/Street/Input/{camID:05d}/{imgID:05d}.jpg",
+    "img_pattern": "/home/smrtsyslab/projects/deepstitch-dataset/raw_data/Street/Input/{camID:05d}/{imgID:05d}.jpg",
     "nb_cameras": 14,
     "calib_img_id": 0,
-    "nb_img_generate": 2,
+    "nb_img_generate": 3,
     "total_img": 486
+  },
+   "4": {
+    "img_pattern": "/home/smrtsyslab/projects/deepstitch-dataset/raw_data/Hangars/Input/{camID:05d}/{imgID:05d}.jpg",
+    "nb_cameras": 5,
+    "calib_img_id": 0,
+    "nb_img_generate": 2,
+    "total_img": 300
+  },
+   "5": {
+    "img_pattern": "/home/smrtsyslab/projects/deepstitch-dataset/raw_data/Opera/Input/{camID:05d}/{imgID:05d}.jpg",
+    "nb_cameras": 5,
+    "calib_img_id": 0,
+    "nb_img_generate": 3,
+    "total_img": 450
   }
 }

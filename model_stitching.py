@@ -15,13 +15,17 @@ import img_utils
 from data_generator import read_img_dataset  # , DataGenerator, image_stitching_generator
 import prepare_stitching_data as psd
 from sklearn.model_selection import train_test_split
-import project_settings as cfg
+import constant as cfg
 
 import numpy as np
 import os
 import glob
 import time
 import warnings
+
+gpus = tf.config.experimental.list_physical_devices('GPU')
+for gpu in gpus:
+  tf.config.experimental.set_memory_growth(gpu, True)
 
 try:
     import cv2
@@ -79,7 +83,7 @@ class BaseStitchingModel(object):
 
     def __init__(self, model_name):
         """
-        Base model to provide a standard interface of adding Super Resolution models
+        Base model to provide a standard interface of adding Image Stiching models
         """
         self.shape = (None, None, None)
         self.model = None  # type: Model
@@ -91,8 +95,6 @@ class BaseStitchingModel(object):
         # self.type_requires_divisible_shape = False
         # self.type_true_upscaling = False
 
-        self.evaluation_func = None
-        # self.uses_learning_phase = False
 
     def create_model(self, height=32, width=32, channels=3, nb_camera=5, load_weights=False) -> Model:
         """
@@ -137,9 +139,7 @@ class BaseStitchingModel(object):
         # validation_generator = DataGenerator(test_indexes, config_data, callee="validation_generator", **params)
 
         training_generator = read_img_dataset(train_indexes, config_data, callee="training_generator", **params)
-        # training_generator = read_img_dataset([23, 50, 400], config_data, callee="training_generator", **params)
         validation_generator = read_img_dataset(test_indexes, config_data, callee="validation_generator", **params)
-        # validation_generator = read_img_dataset([10, 40, 500], config_data, callee="validation_generator", **params)
 
         if save_history:
             callback_list.append(HistoryCheckpoint(f'{cfg.log_dir}/{history_fn}'))
@@ -150,39 +150,6 @@ class BaseStitchingModel(object):
                 callback_list.append(tensorboard)
 
         print("Training model : %s" % self.__class__.__name__)
-        # self.model.fit_generator(img_utils.image_stitching_generator(train_path, scale_factor=self.scale_factor,
-        #                                                              small_train_images=self.type_true_upscaling,
-        #                                                              batch_size=batch_size),
-        #                          steps_per_epoch=samples_per_epoch // batch_size + 1,
-        #                          epochs=nb_epochs, callbacks=callback_list,
-        #                          validation_data=img_utils.image_generator(validation_path,
-        #                                                                    scale_factor=self.scale_factor,
-        #                                                                    small_train_images=self.type_true_upscaling,
-        #                                                                    batch_size=batch_size),
-        #                          validation_steps=val_count // batch_size + 1,
-        #                          use_multiprocessing=True)
-
-        # Train model on dataset
-        # self.model.fit_generator(generator=training_generator,
-        #                          steps_per_epoch=samples_per_epoch // batch_size + 1,
-        #                          epochs=nb_epochs,
-        #                          callbacks=callback_list,
-        #                          validation_data=validation_generator,
-        #                          validation_steps=val_count // batch_size + 1,
-        #                          use_multiprocessing=True,
-        #                          workers=2)
-        # self.model.fit_generator(generator=training_generator,
-        #                          steps_per_epoch=samples_per_epoch // batch_size + 1,
-        #                          epochs=nb_epochs,
-        #                          callbacks=callback_list,
-        #                          validation_data=validation_generator,
-        #                          validation_steps=val_count // batch_size + 1,
-        #                          validation_freq=2,
-        #                          use_multiprocessing=False)
-
-        # print(list(training_generator.enumerate()))
-        # for item in training_generator.enumerate(start=0):
-        #     print(item)
 
         self.model.fit(training_generator,
                        epochs=nb_epochs,
@@ -354,6 +321,7 @@ class BaseStitchingModel(object):
         filename = os.path.join(out_dir, "result_" + str(suffix) +
                                 time.strftime("_%Y%m%d-%H%M%S") + ".jpg")
         print("Output Result File: %s" % filename)
+        os.makedirs(out_dir, exist_ok=True)
 
         # img_conv, h, w = self.__read_conv_img(img_path, scale_factor)
         h, w = img_conv.shape[1], img_conv.shape[2]
@@ -409,7 +377,6 @@ class ResNetStitch(BaseStitchingModel):
         self.mode = 2
 
         self.weight_path = "weights/ResNetStitch.h5"
-        # self.type_true_upscaling = True
 
     def create_model(self, height=32, width=32, channels=3, nb_camera=5, load_weights=False):
         init = super(ResNetStitch, self).create_model(height, width, channels, nb_camera, load_weights)

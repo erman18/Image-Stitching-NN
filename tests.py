@@ -4,7 +4,7 @@ from keras.utils.vis_utils import plot_model
 import models
 import model_stitching
 import img_utils
-import project_settings as cfg
+import constant as cfg
 
 if __name__ == "__main__":
     path = r"headline_carspeed.jpg"
