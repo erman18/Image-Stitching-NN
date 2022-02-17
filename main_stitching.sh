@@ -38,7 +38,7 @@ DFS="MCMI"
 # NBI=430 # Maximum number of image to use for calibration
 # SCALE_FACTOR=3
 
-# Data Test 5
+# # Data Test 5
 # # IMGDIR=/home/smrtsyslab/projects/deepstitch-dataset/raw_data/Airplanes/Calibration
 # OUTDIR=/home/smrtsyslab/projects/deepstitch-dataset/out_result/cvpr_result/Airplanes
 # CALIB_PATTERN=/home/smrtsyslab/projects/deepstitch-dataset/raw_data/Airplanes/Input/{camID:05d}/{imgID:05d}.jpg
@@ -77,19 +77,25 @@ SCALE_FACTOR=2
 
 # # Data Test 9
 # IMGDIR=/home/smrtsyslab/projects/deepstitch-dataset/raw_data/example-data/Campus/CMU1
-# OUTDIR=/home/smrtsyslab/projects/deepstitch-dataset/raw_data/example-data/Campus/CMU1
+# OUTDIR=/home/smrtsyslab/projects/deepstitch-dataset/raw_data/example-data/Campus/CMU1/result
 # DFS="IDIR"
 # SCALE_FACTOR=2
 
 # # Data Test 10
 # IMGDIR=/home/smrtsyslab/projects/deepstitch-dataset/raw_data/own/homestreet
-# OUTDIR=/home/smrtsyslab/projects/deepstitch-dataset/raw_data/own/homestreet
+# OUTDIR=/home/smrtsyslab/projects/deepstitch-dataset/raw_data/own/homestreet/result
 # DFS="IDIR"
 # SCALE_FACTOR=1
 
 # # Data Test 11
 # IMGDIR=/home/smrtsyslab/projects/deepstitch-dataset/raw_data/own/oncampus
-# OUTDIR=/home/smrtsyslab/projects/deepstitch-dataset/raw_data/own/oncampus
+# OUTDIR=/home/smrtsyslab/projects/deepstitch-dataset/raw_data/own/oncampus/result
+# DFS="IDIR"
+# SCALE_FACTOR=1
+
+# # Data Test 12
+# IMGDIR=/home/smrtsyslab/projects/deepstitch-dataset/raw_data/own/physbuilding
+# OUTDIR=/home/smrtsyslab/projects/deepstitch-dataset/raw_data/own/physbuilding/result
 # DFS="IDIR"
 # SCALE_FACTOR=1
 

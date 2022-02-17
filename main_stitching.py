@@ -83,7 +83,8 @@ def stitch(files, model_type, outdir, scale_factor, compare_result=True):
 
     img_mbb = None
     if compare_result:
-        img_mbb = panow.pano_stitch_single_camera(files, multi_band_blend=20, return_img=True)
+        out_filename=os.path.join(outdir, "multiband_20_" + time.strftime("_%Y%m%d-%H%M%S") + ".jpg")
+        img_mbb = panow.pano_stitch_single_camera(files, out_filename=out_filename, multi_band_blend=20, return_img=True)
         img_mbb = img_mbb.astype(np.float32) * 255.
         img_mbb = np.clip(img_mbb, 0, 255).astype('uint8')
         img_mbb = img_mbb[0, :, :, :]

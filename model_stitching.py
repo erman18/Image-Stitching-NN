@@ -59,25 +59,6 @@ def psnr(y_true, y_pred):
 
 def SSIMLoss(y_true, y_pred):
     return tf.image.ssim(y_true, y_pred, max_val=1)
-#
-# def custom_loss(y_true, y_pred):
-#     dy0, dx0 = tf.image.image_gradients(y_true)
-#     dy1, dx1 = tf.image.image_gradients(y_pred)
-#
-#     mse = K.mean(K.square(y_pred - y_true))
-#     l0 = K.mean(K.square(y_pred - y_true))
-#
-#     return
-
-
-def custom_loss(y_true, y_pred):
-    dy_true, dx_true = tf.image.image_gradients(y_true)
-    dy_pred, dx_pred = tf.image.image_gradients(y_pred)
-
-    # Use convolution to compute the correlation between patches.
-    m_loss = K.mean(K.abs(dy_pred - dy_true) + K.abs(dx_pred - dx_true), axis=-1)
-    return m_loss
-
 
 class BaseStitchingModel(object):
 

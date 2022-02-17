@@ -36,74 +36,77 @@ except:
     warnings.warn('Could not load opencv properly. This may affect the quality of output images.')
     _cv2_available = False
 
-def custom_loss(y_true, y_pred):
-    '''
-    Loss functon for the Unsupervised Training
-        - y_true: is the same shape (W * H * 3 * N) as the input dataset
-            where N is the number of cameras/layers.
-        - y_pred: is the target stitched image (W * H * 3)
-    '''
-    print(tf.executing_eagerly())
-    dy_pred, dx_pred = tf.image.image_gradients(y_pred)
-    # dy_true, dx_true = tf.image.image_gradients(y_true)
+# Make Gaussian kernel following SciPy logic
+## gauss_kernel = make_gaussian_2d_kernel(std, halfx)
+def make_gaussian_2d_kernel(sigma, radius, dtype=tf.float32):
+    # radius = tf.cast(sigma * truncate, tf.int32)
+    x = tf.cast(tf.range(-radius, radius + 1), dtype=dtype)
+    k = tf.exp(-0.5 * tf.square(x / sigma))
+    k = k / tf.reduce_sum(k)
+    return tf.expand_dims(k, 1) * k
 
-    # Mask applied
-    m_loss = 0
-    for k in range(abs(cfg.sandfall_layer)):
-        y_true_k = y_true[:, :, :, 3*k:3*(k+1)]
-        # y_true_k = y_true[:, :, :, 0:3]
-        # tf.print("+++++++++++shape: ", y_true_k.shape, "\n", y_true.shape)
-        # dy_true_k = y_true_k[:, 1:, :, :] - y_true_k[:, :-1, :, :]
-        # dx_true_k = y_true_k[:, :, 1:, :] - y_true_k[:, :, :-1, :]
-        dy_true_k, dx_true_k = tf.image.image_gradients(y_true_k)
+def PSNRLoss(y_true, y_pred):
+    """
+    PSNR is Peek Signal to Noise Ratio, which is similar to mean squared error.
+    It can be calculated as
+    PSNR = 20 * log10(MAXp) - 10 * log10(MSE)
+    When providing an unscaled input, MAXp = 255. Therefore 20 * log10(255)== 48.1308036087.
+    However, since we are scaling our input, MAXp = 1. Therefore 20 * log10(1) = 0.
+    Thus we remove that component completely and only compute the remaining MSE component.
+    """
+    return -10. * K.log(K.mean(K.square(y_pred - y_true))) / K.log(10.)
+    # return K.cast(-10. * K.log(K.mean(K.square(y_pred - y_true))) / K.log(10.), dtype='float32')
 
-        dx_pred1 = dx_pred[y_true_k != 0]
-        dy_pred1 = dy_pred[y_true_k != 0]
 
-        # Use convolution to compute the correlation between patches.
-        m_loss += K.mean(K.abs(dy_pred1 - dy_true_k) + K.abs(dx_pred1 - dx_true_k), axis=-1)
-        # masked_loss = np.abs(1 - y_pred[y_pred != 0]).mean()
-    return m_loss
+def psnr(y_true, y_pred):
+    assert y_true.shape == y_pred.shape, "Cannot calculate PSNR. Input shapes not same." \
+                                         " y_true shape = %s, y_pred shape = %s" % (str(y_true.shape),
+                                                                                    str(y_pred.shape))
 
-def custom_loss_2(y_true, y_pred):
-    '''
-    Loss functon for the Unsupervised Training
-        - y_true: is the same shape (W * H * 3 * N) as the input dataset
-            where N is the number of cameras/layers.
-        - y_pred: is the target stitched image (W * H * 3)
-    '''
-    with tf.GradientTape():
-        print(tf.executing_eagerly())
-        # inp, out = inputs
-        dy_pred, dx_pred = tf.image.image_gradients(y_pred)
-        print("===================================", y_true.shape)
-        dy_true, dx_true = tf.image.image_gradients(y_true)
+    return -10. * np.log10(np.mean(np.square(y_pred - y_true)))
 
-        m_loss = 0
-        for k in range(abs(cfg.sandfall_layer)):
-            
-            mask_x = tf.where(y_true[:, :, :, 3*k:3*(k+1)] != 0, 1., 0.)
-            mask_y = tf.where(y_true[:, :, :, 3*k:3*(k+1)] != 0, 1., 0.)
-            y_c = tf.abs((mask_y*dy_pred) - dy_true[:, :, :, 3*k:3*(k+1)])
-            x_c = tf.abs((mask_x*dx_pred) - dx_true[:, :, :, 3*k:3*(k+1)])
 
-            # kernels = np.expand_dims(np.ones((4,4,3), dtype=x_c.dtype), -2)
-            kernels = np.ones((33,33,3,3), dtype=np.float32)
-            kernels_tf = tf.constant(kernels, dtype=tf.float32)
+def SSIMLoss(y_true, y_pred):
+    return tf.image.ssim(y_true, y_pred, max_val=1.0)
 
-            # Output tensor has shape [batch_size, h, w, d * num_kernels].
-            strides = [1, 1, 1, 1]
-            # output = tf.depthwise_conv2d(padded, kernels_tf, strides, 'VALID')
-            out_x = tf.nn.conv2d(x_c, kernels_tf, strides=strides, padding='SAME')
-            out_y = tf.nn.conv2d(y_c, kernels_tf, strides=strides, padding='SAME')
+# def custom_loss(y_true, y_pred):
+#     '''
+#     Loss functon for the Unsupervised Training
+#         - y_true: is the same shape (W * H * 3 * N) as the input dataset
+#             where N is the number of cameras/layers.
+#         - y_pred: is the target stitched image (W * H * 3)
+#     '''
+#     print("Is eager excution enable: ", tf.executing_eagerly())
+#     dy_pred, dx_pred = tf.image.image_gradients(y_pred)
+#     # dy_true, dx_true = tf.image.image_gradients(y_true)
 
-            # Use convolution to compute the correlation between patches.
-            # m_loss += K.mean(K.abs((mask_y*dy_pred) - dy_true[:, :, :, 3*k:3*(k+1)]) + K.abs((mask_x*dx_pred) - dx_true[:, :, :, 3*k:3*(k+1)]), axis=-1)
-            m_loss += tf.reduce_mean(out_x + out_y, axis=None)
+#     # Mask applied
+#     m_loss = 0
+#     for k in range(abs(cfg.sandfall_layer)):
+#         y_true_k = y_true[:, :, :, 3*k:3*(k+1)]
+#         # y_true_k = y_true[:, :, :, 0:3]
+#         # tf.print("+++++++++++shape: ", y_true_k.shape, "\n", y_true.shape)
+#         # dy_true_k = y_true_k[:, 1:, :, :] - y_true_k[:, :-1, :, :]
+#         # dx_true_k = y_true_k[:, :, 1:, :] - y_true_k[:, :, :-1, :]
+#         dy_true_k, dx_true_k = tf.image.image_gradients(y_true_k)
 
-    return m_loss
+#         dx_pred1 = dx_pred[y_true_k != 0]
+#         dy_pred1 = dy_pred[y_true_k != 0]
+
+#         # Use convolution to compute the correlation between patches.
+#         m_loss += K.mean(K.abs(dy_pred1 - dy_true_k) + K.abs(dx_pred1 - dx_true_k), axis=-1)
+#         # masked_loss = np.abs(1 - y_pred[y_pred != 0]).mean()
+#     return m_loss
+
+# Keras losses
+def mean_squared_error(y_true, y_pred):
+    return K.mean(K.square(y_pred - y_true), axis=-1)
 
 class gradient_layer_loss(tf.keras.layers.Layer):
+    def __init__(self, **kwargs):
+        self.alpha = 0.08
+        super(gradient_layer_loss, self).__init__(**kwargs)
+
     # def call(self, inputs):
     #     # X: input tensor
     #     # Out: output tensor
@@ -138,13 +141,16 @@ class gradient_layer_loss(tf.keras.layers.Layer):
     def call(self, inputs):
         # X: input tensor
         # Out: output tensor
+        print("Is eager excution enable: ", tf.executing_eagerly())
         inp, out = inputs
         dy_pred, dx_pred = tf.image.image_gradients(out)
         dy_true, dx_true = tf.image.image_gradients(inp)
 
         # kernels = np.expand_dims(np.ones((4,4,3), dtype=x_c.dtype), -2)
-        kernels = np.ones((15,15,3,3), dtype=np.float32)
+        # kernels = np.ones((15,15,3,1), dtype=np.float32)
+        kernels = np.ones((15,15,3,1), dtype=np.float32) # * np.array([0.2126, 0.7152, 0.0722])
         kernels_tf = tf.constant(kernels, dtype=tf.float32)
+
         # Output tensor has shape [batch_size, h, w, d * num_kernels].
         strides = [1, 1, 1, 1]
 
@@ -169,7 +175,7 @@ class gradient_layer_loss(tf.keras.layers.Layer):
             m_loss += tf.reduce_mean(y_c + x_c, axis=None)
             # tf.keras.losses.Loss
 
-        return m_loss
+        return self.alpha*m_loss
 
 class BaseStitchingModel(object):
 
@@ -200,8 +206,9 @@ class BaseStitchingModel(object):
 
         if self.model is None: self.create_model()
 
-        callback_list = [callbacks.ModelCheckpoint(self.weight_path, monitor='val_PSNRLoss', save_best_only=True,
-                                                   mode='max', save_weights_only=True, verbose=2)]
+        # callback_list = [callbacks.ModelCheckpoint(self.weight_path, monitor='val_PSNRLoss', save_best_only=True,
+        #                                            mode='max', save_weights_only=True, verbose=2)]
+        callback_list = []
 
         # Parameters
         params = {'dim': (self.shape[0], self.shape[1]),
@@ -213,11 +220,19 @@ class BaseStitchingModel(object):
         # Datasets
         config_data = psd.read_json_file(cfg.config_img_output)
         data_indexes = np.arange(config_data["total_samples"])
-        samples_per_epoch = len(data_indexes)
+        # samples_per_epoch = len(data_indexes)
+        train_indexes, test_indexes = train_test_split(data_indexes, test_size=0.10)
+        samples_per_epoch = len(train_indexes)
+        val_count = len(test_indexes)
 
-        training_generator = un_read_img_dataset(data_indexes, config_data, callee="un_training_generator", **params)
-        callback_list = [callbacks.ModelCheckpoint(self.weight_path, monitor='loss', save_best_only=True,
-                                                mode='max', save_weights_only=True, verbose=2)]
+        training_generator = un_read_img_dataset(train_indexes, config_data, callee="un_training_generator", **params)
+        validation_generator = un_read_img_dataset(test_indexes, config_data, callee="un_validation_generator", **params)
+        callback_list.append(callbacks.ModelCheckpoint(self.weight_path, monitor='loss', save_best_only=True,
+                                                mode='min', save_weights_only=True, verbose=2))
+
+        # TODO: Guard this with an if condition to use this checkpoint only when dealing with supervised training
+        callback_list.append(callbacks.ModelCheckpoint(self.weight_path, monitor='val_PSNRLoss', save_best_only=True,
+                                                   mode='max', save_weights_only=True, verbose=2))
 
         if save_history:
             callback_list.append(HistoryCheckpoint(f'{cfg.log_dir}/{history_fn}'))
@@ -231,6 +246,8 @@ class BaseStitchingModel(object):
 
         self.model.fit(training_generator,
                        epochs=nb_epochs,
+                       validation_data=validation_generator,
+                       validation_steps=val_count // batch_size + 1,
                        steps_per_epoch=samples_per_epoch // batch_size + 1,
                        callbacks=callback_list,
                        use_multiprocessing=True,
@@ -301,14 +318,14 @@ class ResNetStitch(BaseStitchingModel):
         super(ResNetStitch, self).__init__("UnResNetStitch")
 
         self.n = 64
-        self.mode = 2
+        # self.mode = 2
 
         self.weight_path = "weights/UnResNetStitch.h5"
 
     def create_model(self, height=32, width=32, channels=3, nb_camera=5, load_weights=False):
         init = super(ResNetStitch, self).create_model(height, width, channels, nb_camera, load_weights)
 
-        x0 = Convolution2D(64, (3, 3), activation='relu', padding='same', name='sr_res_conv1')(init)
+        x0 = Convolution2D(64, (3, 3), activation='relu', padding='same', name='sr_res_conv1', kernel_initializer="he_normal")(init)
 
         x = self._residual_block(x0, 1)
 
@@ -324,7 +341,7 @@ class ResNetStitch(BaseStitchingModel):
         # x = self._upscale_block(x, 2)
         # x = Add()([x, x0])
 
-        x = Convolution2D(3, (3, 3), activation="linear", padding='same', name='sr_res_conv_final')(x)
+        x = Convolution2D(3, (3, 3), activation="linear", padding='same', name='sr_res_conv_final', kernel_initializer="he_normal")(x)
 
         m_custom_loss = gradient_layer_loss()([init, x])
         model = Model(init, x)
@@ -334,49 +351,53 @@ class ResNetStitch(BaseStitchingModel):
         model.add_loss(m_custom_loss)
         # potential solution to explore: Check VAE Loss
 
-        model.compile(optimizer=adam, metrics=None)
+        model.compile(optimizer=adam, loss="mse", metrics=[PSNRLoss, SSIMLoss])
 
-        if load_weights:
+        if load_weights and os.path.exists(self.weight_path):
             print(f"Loading model weights at {self.weight_path}...")
             model.load_weights(self.weight_path, by_name=True)
+        elif load_weights:
+            cfg.PRINT_WARNING(f"Cannot load the file {self.weight_path}, it doesn't exist!")
         model.summary()
 
         self.model = model
         return model
 
     def _residual_block(self, ip, id):
-        mode = False if self.mode == 2 else None
+        # mode = True # False if self.mode == 2 else None
         channel_axis = 1 if K.image_data_format() == 'channels_first' else -1
         init = ip
 
         x = Convolution2D(64, (3, 3), activation='linear', padding='same',
-                          name='sr_res_conv_' + str(id) + '_1')(ip)
-        x = BatchNormalization(axis=channel_axis, name="sr_res_batchnorm_" + str(id) + "_1")(x, training=mode)
-        x = Activation('relu', name="sr_res_activation_" + str(id) + "_1")(x)
+                          name='sr_res_conv_' + str(id) + '_1', kernel_initializer="he_normal")(ip)
+        x = BatchNormalization(axis=channel_axis, name="sr_res_batchnorm_" + str(id) + "_1")(x)
+        # x = Activation('relu', name="sr_res_activation_" + str(id) + "_1")(x)
+        x = LeakyReLU(alpha=0.2, name="sr_res_activation_" + str(id) + "_1")(x)
 
         x = Convolution2D(64, (3, 3), activation='linear', padding='same',
-                          name='sr_res_conv_' + str(id) + '_2')(x)
-        x = BatchNormalization(axis=channel_axis, name="sr_res_batchnorm_" + str(id) + "_2")(x, training=mode)
+                          name='sr_res_conv_' + str(id) + '_2', kernel_initializer="he_normal")(x)
+        x = BatchNormalization(axis=channel_axis, name="sr_res_batchnorm_" + str(id) + "_2")(x)
+        # x = LeakyReLU(alpha=0.2, name="sr_res_activation_" + str(id) + "_2")(x)
 
         m = Add(name="sr_res_merge_" + str(id))([x, init])
 
         return m
 
-    def _upscale_block(self, ip, id):
-        init = ip
+    # def _upscale_block(self, ip, id):
+    #     init = ip
 
-        channel_dim = 1 if K.image_data_format() == 'channels_first' else -1
-        channels = init.shape[channel_dim]  # init._keras_shape[channel_dim]
+    #     channel_dim = 1 if K.image_data_format() == 'channels_first' else -1
+    #     channels = init.shape[channel_dim]  # init._keras_shape[channel_dim]
 
-        # x = Convolution2D(256, (3, 3), activation="relu", padding='same', name='sr_res_upconv1_%d' % id)(init)
-        # x = SubPixelUpscaling(r=2, channels=self.n, name='sr_res_upscale1_%d' % id)(x)
-        x = UpSampling2D()(init)
-        x = Convolution2D(self.n, (3, 3), activation="relu", padding='same', name='sr_res_filter1_%d' % id)(x)
+    #     # x = Convolution2D(256, (3, 3), activation="relu", padding='same', name='sr_res_upconv1_%d' % id)(init)
+    #     # x = SubPixelUpscaling(r=2, channels=self.n, name='sr_res_upscale1_%d' % id)(x)
+    #     x = UpSampling2D()(init)
+    #     x = Convolution2D(self.n, (3, 3), activation="relu", padding='same', name='sr_res_filter1_%d' % id)(x)
 
-        # x = Convolution2DTranspose(channels, (4, 4), strides=(2, 2), padding='same', activation='relu',
-        #                            name='upsampling_deconv_%d' % id)(init)
+    #     # x = Convolution2DTranspose(channels, (4, 4), strides=(2, 2), padding='same', activation='relu',
+    #     #                            name='upsampling_deconv_%d' % id)(init)
 
-        return x
+    #     return x
 
     def fit(self, batch_size=128, nb_epochs=100, save_history=True, history_fn="ResNetSR History.txt"):
         super(ResNetStitch, self).fit(batch_size, nb_epochs, save_history, history_fn)

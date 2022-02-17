@@ -168,9 +168,10 @@ def un_load_data_sample(img_paths, dim, n_channels, training_folder):
     ts = psd.TrainingSample(datasetID=dataset_id, imgID=img_id, patchX=patchx_id,
                             patchY=patchy_id, image_folder=training_folder.decode("utf-8"))
     X = ts.load_sample()
+    y = ts.load_target()
     # print("===================================", X.shape)
 
-    return X, X
+    return X, y
 
 
 ## Loading function for self-supervised training
