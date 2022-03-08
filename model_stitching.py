@@ -317,7 +317,7 @@ class BaseStitchingModel(object):
 
         # Create prediction for image patches
         print("Starting the image stitching prediction")
-        result = model.predict(img_conv, verbose=verbose, workers=2, use_multiprocessing=True)
+        result = self.model.predict(img_conv, verbose=verbose, workers=2, use_multiprocessing=True)
 
         # Deprocess patches
         if verbose: print("De-processing images.")
