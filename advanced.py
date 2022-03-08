@@ -1,5 +1,6 @@
 import itertools
 
+import tensorflow as tf
 from tensorflow.keras.layers import Activation, Reshape, Lambda, concatenate, dot, add
 from tensorflow.keras.layers import Conv1D, Conv2D, Conv3D
 from tensorflow.keras.layers import MaxPool1D
@@ -62,6 +63,7 @@ class TensorBoardBatch(TensorBoard):
     def __init__(self, log_dir='./logs',
                  histogram_freq=0,
                  batch_size=32,
+                 init_step = 1, # This field help if we want to continue with the history afer a restart
                  write_graph=True,
                  write_grads=False,
                  write_images=False,
@@ -70,7 +72,7 @@ class TensorBoardBatch(TensorBoard):
                  embeddings_metadata=None):
         super(TensorBoardBatch, self).__init__(log_dir,
                                                histogram_freq=histogram_freq,
-                                               batch_size=batch_size,
+                                            #    batch_size=batch_size,
                                                write_graph=write_graph,
                                                write_grads=write_grads,
                                                write_images=write_images,
@@ -79,9 +81,9 @@ class TensorBoardBatch(TensorBoard):
                                                embeddings_metadata=embeddings_metadata)
 
         # conditionally import tensorflow iff TensorBoardBatch is created
-        self.tf = __import__('tensorflow')
-        self.global_step = 1
-        self.writer = self.tf.summary.create_file_writer(log_dir)
+        # self.tf = __import__('tensorflow')
+        self.global_step = init_step
+        self.writer = tf.summary.create_file_writer(log_dir)
 
     def on_batch_end(self, batch, logs=None):
         logs = logs or {}
@@ -89,14 +91,9 @@ class TensorBoardBatch(TensorBoard):
         for name, value in logs.items():
             if name in ['batch', 'size']:
                 continue
-            # summary = self.tf.summary()
-            # summary_value = summary.value.add()
-            # summary_value.simple_value = value.item()
-            # summary_value.tag = name
-            # self.writer.add_summary(summary, self.global_step)
 
             with self.writer.as_default():
-                self.tf.summary.scalar(name, value.item(), self.global_step)
+                tf.summary.scalar(name, value.item(), self.global_step)
 
         self.global_step += 1
 
@@ -108,14 +105,9 @@ class TensorBoardBatch(TensorBoard):
         for name, value in logs.items():
             if name in ['batch', 'size']:
                 continue
-            # summary = self.tf.summary()
-            # summary_value = summary.value.add()
-            # summary_value.simple_value = value #.item()
-            # summary_value.tag = name
-            # self.writer.add_summary(summary, self.global_step)
-
+            
             with self.writer.as_default():
-                self.tf.summary.scalar(name, value, self.global_step)
+                tf.summary.scalar(name, value, self.global_step)
 
         self.global_step += 1
         self.writer.flush()

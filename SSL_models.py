@@ -1,4 +1,5 @@
 from __future__ import print_function, division
+from tkinter import E
 
 import tensorflow as tf
 from tensorflow.keras.models import Model
@@ -11,9 +12,9 @@ import tensorflow.keras.callbacks as callbacks
 import tensorflow.keras.optimizers as optimizers
 
 from advanced import HistoryCheckpoint, non_local_block, TensorBoardBatch
-import img_utils
+# import img_utils
 from un_data_generator import un_read_img_dataset  # , DataGenerator, image_stitching_generator
-import prepare_stitching_data as psd
+import prepare_data as psd
 from sklearn.model_selection import train_test_split
 import constant as cfg
 
@@ -69,74 +70,60 @@ def psnr(y_true, y_pred):
 def SSIMLoss(y_true, y_pred):
     return tf.image.ssim(y_true, y_pred, max_val=1.0)
 
-# def custom_loss(y_true, y_pred):
-#     '''
-#     Loss functon for the Unsupervised Training
-#         - y_true: is the same shape (W * H * 3 * N) as the input dataset
-#             where N is the number of cameras/layers.
-#         - y_pred: is the target stitched image (W * H * 3)
-#     '''
-#     print("Is eager excution enable: ", tf.executing_eagerly())
-#     dy_pred, dx_pred = tf.image.image_gradients(y_pred)
-#     # dy_true, dx_true = tf.image.image_gradients(y_true)
-
-#     # Mask applied
-#     m_loss = 0
-#     for k in range(abs(cfg.sandfall_layer)):
-#         y_true_k = y_true[:, :, :, 3*k:3*(k+1)]
-#         # y_true_k = y_true[:, :, :, 0:3]
-#         # tf.print("+++++++++++shape: ", y_true_k.shape, "\n", y_true.shape)
-#         # dy_true_k = y_true_k[:, 1:, :, :] - y_true_k[:, :-1, :, :]
-#         # dx_true_k = y_true_k[:, :, 1:, :] - y_true_k[:, :, :-1, :]
-#         dy_true_k, dx_true_k = tf.image.image_gradients(y_true_k)
-
-#         dx_pred1 = dx_pred[y_true_k != 0]
-#         dy_pred1 = dy_pred[y_true_k != 0]
-
-#         # Use convolution to compute the correlation between patches.
-#         m_loss += K.mean(K.abs(dy_pred1 - dy_true_k) + K.abs(dx_pred1 - dx_true_k), axis=-1)
-#         # masked_loss = np.abs(1 - y_pred[y_pred != 0]).mean()
-#     return m_loss
-
 # Keras losses
 def mean_squared_error(y_true, y_pred):
-    return K.mean(K.square(y_pred - y_true), axis=-1)
+    # return K.mean(K.square(y_pred - y_true), axis=-1)
+    return K.mean(K.square(y_pred - y_true))
+
+def perceptual_loss(input_tensor, output_tensor, in_shape):
+    ### Create Loss Model (VGG16) ###
+    
+    true_X_input = Input(shape=(in_shape[0], in_shape[1], 3))
+
+    x = Concatenate(axis=0)([output_tensor, true_X_input])
+    
+    m_vgg = tf.keras.applications.vgg16.VGG16(include_top=False, weights='imagenet', 
+                            input_tensor=x, input_shape=(in_shape[0], in_shape[1], 3))
+
+    # m_vgg = tf.keras.applications.vgg16.VGG16(include_top=False, weights='imagenet', 
+    #                         input_shape=(in_shape[0], in_shape[1], 3)) 
+    # x = m_vgg(x)
+    # tf.concat(x)
+
+    model = Model([input_tensor, true_X_input], x)
+    # model = Model([input_tensor, true_X_input], m_vgg.layers[-1].output)
+    # model = Model([input_tensor, true_X_input], m_vgg.output)
+
+    # Freeze all VGG layers
+    for layer in model.layers[-19:]:
+        layer.trainable=False
+
+    return model
+
+
+class VGGLossNetwork(tf.keras.models.Model):
+    def __init__(self, style_layers = ['block1_conv2',
+                                       'block2_conv2',
+                                       'block3_conv3', 
+                                       'block4_conv3']):
+        super(VGGLossNetwork, self).__init__()
+        vgg = tf.keras.applications.vgg16.VGG16(include_top=False, weights='imagenet')
+        vgg.trainable = False
+        model_outputs = [vgg.get_layer(name).output for name in style_layers]
+        self.model = tf.keras.models.Model(vgg.input, model_outputs)
+        # mixed precision float32 output
+        self.linear = Activation('linear', dtype='float32') 
+
+    def call(self, x):
+        x = tf.keras.applications.vgg16.preprocess_input(x)
+        x = self.model(x)
+        return self.linear(x)
+
 
 class gradient_layer_loss(tf.keras.layers.Layer):
     def __init__(self, **kwargs):
         self.alpha = 0.08
         super(gradient_layer_loss, self).__init__(**kwargs)
-
-    # def call(self, inputs):
-    #     # X: input tensor
-    #     # Out: output tensor
-    #     inp, out = inputs
-    #     dy_pred, dx_pred = tf.image.image_gradients(out)
-    #     dy_true, dx_true = tf.image.image_gradients(inp)
-
-    #     m_loss = 0
-    #     for k in range(abs(cfg.sandfall_layer)):
-            
-    #         mask_x = tf.where(inp[:, :, :, 3*k:3*(k+1)] != 0, 1., 0.)
-    #         mask_y = tf.where(inp[:, :, :, 3*k:3*(k+1)] != 0, 1., 0.)
-    #         y_c = tf.abs((mask_y*dy_pred) - dy_true[:, :, :, 3*k:3*(k+1)])
-    #         x_c = tf.abs((mask_x*dx_pred) - dx_true[:, :, :, 3*k:3*(k+1)])
-
-    #         # kernels = np.expand_dims(np.ones((4,4,3), dtype=x_c.dtype), -2)
-    #         kernels = np.ones((33,33,3,3), dtype=np.float32)
-    #         kernels_tf = tf.constant(kernels, dtype=tf.float32)
-
-    #         # Output tensor has shape [batch_size, h, w, d * num_kernels].
-    #         strides = [1, 1, 1, 1]
-    #         # output = tf.depthwise_conv2d(padded, kernels_tf, strides, 'VALID')
-    #         out_x = tf.nn.conv2d(x_c, kernels_tf, strides=strides, padding='SAME')
-    #         out_y = tf.nn.conv2d(y_c, kernels_tf, strides=strides, padding='SAME')
-
-    #         # Use convolution to compute the correlation between patches.
-    #         # m_loss += K.mean(K.abs((mask_y*dy_pred) - dy_true[:, :, :, 3*k:3*(k+1)]) + K.abs((mask_x*dx_pred) - dx_true[:, :, :, 3*k:3*(k+1)]), axis=-1)
-    #         m_loss += tf.reduce_mean(out_x + out_y, axis=None)
-
-    #     return m_loss
 
     def call(self, inputs):
         # X: input tensor
@@ -177,6 +164,10 @@ class gradient_layer_loss(tf.keras.layers.Layer):
 
         return self.alpha*m_loss
 
+    def get_config(self):
+        basic_config = super(gradient_layer_loss, self).get_config()
+        return {**basic_config, "alpha": self.alpha}
+
 class BaseStitchingModel(object):
 
     def __init__(self, model_name):
@@ -189,17 +180,23 @@ class BaseStitchingModel(object):
         self.weight_path = None
 
 
-    def create_model(self, height=32, width=32, channels=3, nb_camera=5, load_weights=False) -> Model:
+    def create_model(self, height=32, width=32, channels=3, nb_camera=5, load_weights=False, train_mode=True) -> Model:
         """
         Subclass dependent implementation.
         """
         self.shape = (width, height, channels * nb_camera)
 
-        init = Input(shape=self.shape)
+        init = Input(shape=self.shape, name="main_input")
 
         return init
 
-    def fit(self, batch_size=32, nb_epochs=100, save_history=True, history_fn="Model History.txt") -> Model:
+    def deprocess(self, img):
+        if self.activation == "tanh":
+            return (img + 1.0)/2.0
+        else:
+            return img
+
+    def fit(self, batch_size=32, nb_epochs=100, save_history=True, history_fn="ModelHistory.txt") -> Model:
         """
         Standard method to train any of the models.
         """
@@ -267,8 +264,7 @@ class BaseStitchingModel(object):
         :param mode: mode of upscaling. Can be "patch" or "fast"
         """
 
-        filename = os.path.join(out_dir, "result_" + str(suffix) +
-                                time.strftime("_%Y%m%d-%H%M%S") + ".jpg")
+        filename = os.path.join(out_dir, "result_" + str(suffix) + ".jpg")
         print("Output Result File: %s" % filename)
         os.makedirs(out_dir, exist_ok=True)
 
@@ -278,17 +274,18 @@ class BaseStitchingModel(object):
 
         print("Convolution image data point ready to be used: ", img_conv.shape)
 
-        model = self.create_model(height=h, width=w, load_weights=True)
-        if verbose: print("Model loaded.")
+        if not self.model:
+            self.model = self.create_model(height=h, width=w, load_weights=True)
+            if verbose: print("Model loaded.")
 
         # Create prediction for image patches
         print("Starting the image stitching prediction")
-        result = model.predict(img_conv, verbose=verbose, workers=2, use_multiprocessing=True)
+        result = self.model.predict(img_conv, verbose=verbose, workers=2, use_multiprocessing=True)
 
         # Deprocess patches
         if verbose: print("De-processing images.")
-
-        result = result.transpose((0, 2, 1, 3)).astype(np.float32) * 255.
+        
+        result = self.deprocess(result.transpose((0, 2, 1, 3)).astype(np.float32)) * 255.
 
         result = result[0, :, :, :]  # Access the 3 Dimensional image vector
 
@@ -322,8 +319,20 @@ class ResNetStitch(BaseStitchingModel):
 
         self.weight_path = "weights/UnResNetStitch.h5"
 
-    def create_model(self, height=32, width=32, channels=3, nb_camera=5, load_weights=False):
-        init = super(ResNetStitch, self).create_model(height, width, channels, nb_camera, load_weights)
+
+        # self.img_width = self.shape[0] # img_width
+        # self.img_height = self.shape[1] # img_height
+        # self.pool_type = 0
+
+        # self.simple_loss_weight = 0.1
+        # self.content_weight = 1.0 
+        
+        self.model = None  # type: Model
+        self.activation = "tanh" # The activation function of the last layer of the model
+
+
+    def create_model(self, height=32, width=32, channels=3, nb_camera=5, load_weights=False, train_mode=True):
+        init = super(ResNetStitch, self).create_model(height, width, channels, nb_camera, load_weights, train_mode)
 
         x0 = Convolution2D(64, (3, 3), activation='relu', padding='same', name='sr_res_conv1', kernel_initializer="he_normal")(init)
 
@@ -341,24 +350,33 @@ class ResNetStitch(BaseStitchingModel):
         # x = self._upscale_block(x, 2)
         # x = Add()([x, x0])
 
-        x = Convolution2D(3, (3, 3), activation="linear", padding='same', name='sr_res_conv_final', kernel_initializer="he_normal")(x)
+        x = Convolution2D(3, (3, 3), activation=self.activation, padding='same', name='st_conv_final', kernel_initializer="he_normal")(x)
 
-        m_custom_loss = gradient_layer_loss()([init, x])
+        # m_custom_loss = gradient_layer_loss()([init, x])
         model = Model(init, x)
-        # model.build(self.shape)
+        
+        # adam = optimizers.Adam(learning_rate=1e-3)
 
-        adam = optimizers.Adam(learning_rate=1e-3)
-        model.add_loss(m_custom_loss)
+        # model.add_loss(m_custom_loss)
         # potential solution to explore: Check VAE Loss
 
-        model.compile(optimizer=adam, loss="mse", metrics=[PSNRLoss, SSIMLoss])
+        model.summary()
+        # model.add_metric(PSNRLoss)
+        # from keras.utils.vis_utils import plot_model
+        # plot_model(model, to_file=f"architectures/model_img/any_model.png", show_shapes=True,
+        #            show_layer_names=True)
+        # model.compile(optimizer=adam, metrics=[PSNRLoss, SSIMLoss])
+
+        # model.compile(optimizer=adam, loss={
+        #      "st_conv_final": mean_squared_error},
+        #      loss_weights={"st_conv_final": 1.0})
 
         if load_weights and os.path.exists(self.weight_path):
             print(f"Loading model weights at {self.weight_path}...")
             model.load_weights(self.weight_path, by_name=True)
         elif load_weights:
             cfg.PRINT_WARNING(f"Cannot load the file {self.weight_path}, it doesn't exist!")
-        model.summary()
+        # model.summary()
 
         self.model = model
         return model
@@ -399,6 +417,74 @@ class ResNetStitch(BaseStitchingModel):
 
     #     return x
 
-    def fit(self, batch_size=128, nb_epochs=100, save_history=True, history_fn="ResNetSR History.txt"):
+    def fit(self, batch_size=128, nb_epochs=100, save_history=True, history_fn="UnResNetSRHistory.txt"):
         super(ResNetStitch, self).fit(batch_size, nb_epochs, save_history, history_fn)
 
+
+
+class DeepDenoiseStitch(BaseStitchingModel):
+
+    def __init__(self):
+        super(DeepDenoiseStitch, self).__init__("UnDeepDenoiseStitch")
+
+        # Treat this model as a denoising auto encoder
+        # Force the fit, evaluate and upscale methods to take special care about image shape
+
+        # self.type_requires_divisible_shape = True
+
+        self.n1 = 64
+        self.n2 = 128
+        self.n3 = 256
+
+        self.weight_path = "weights/UnDeepDenoiseStitch.h5"
+        self.activation = "tanh" # The activation function of the last layer of the model
+
+    def create_model(self, height=32, width=32, channels=3, nb_camera=5, load_weights=False):
+        # Perform check that model input shape is divisible by 4
+
+        init = super(DeepDenoiseStitch, self).create_model(height=height, width=width, channels=channels,
+                                                           load_weights=load_weights)
+
+        c1 = Convolution2D(self.n1, (3, 3), activation='relu', padding='same')(init)
+        c1 = Convolution2D(self.n1, (3, 3), activation='relu', padding='same')(c1)
+
+        x = MaxPooling2D((2, 2))(c1)
+
+        c2 = Convolution2D(self.n2, (3, 3), activation='relu', padding='same')(x)
+        c2 = Convolution2D(self.n2, (3, 3), activation='relu', padding='same')(c2)
+
+        x = MaxPooling2D((2, 2))(c2)
+
+        c3 = Convolution2D(self.n3, (3, 3), activation='relu', padding='same')(x)
+
+        x = UpSampling2D()(c3)
+
+        c2_2 = Convolution2D(self.n2, (3, 3), activation='relu', padding='same')(x)
+        c2_2 = Convolution2D(self.n2, (3, 3), activation='relu', padding='same')(c2_2)
+
+        m1 = Add()([c2, c2_2])
+        m1 = UpSampling2D()(m1)
+
+        c1_2 = Convolution2D(self.n1, (3, 3), activation='relu', padding='same')(m1)
+        c1_2 = Convolution2D(self.n1, (3, 3), activation='relu', padding='same')(c1_2)
+
+        m2 = Add()([c1, c1_2])
+
+        # decoded = Convolution2D(channels, 5, 5, activation='linear', padding='same')(m2)
+        decoded = Convolution2D(channels, (5, 5), activation=self.activation, padding='same', name='st_conv_final')(m2)
+
+        model = Model(init, decoded)
+        model.summary()
+        # adam = optimizers.Adam(learning_rate=1e-3)
+        # model.compile(optimizer=adam, loss='mse', metrics=[PSNRLoss, SSIMLoss])
+        if load_weights and os.path.exists(self.weight_path):
+            print(f"Loading model weights at {self.weight_path}...")
+            model.load_weights(self.weight_path, by_name=True)
+        elif load_weights:
+            cfg.PRINT_WARNING(f"Cannot load the file {self.weight_path}, it doesn't exist!")
+
+        self.model = model
+        return model
+
+    def fit(self, batch_size=128, nb_epochs=100, save_history=True, history_fn="UnDeepDenoiseStichHistory.txt"):
+        super(DeepDenoiseStitch, self).fit(batch_size, nb_epochs, save_history, history_fn)

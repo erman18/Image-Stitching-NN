@@ -4,7 +4,7 @@ import numpy as np
 import tensorflow.keras as keras
 import tensorflow as tf
 
-import prepare_stitching_data as psd
+import prepare_data as psd
 import constant as cfg
 import cv2
 import gc

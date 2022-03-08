@@ -11,9 +11,9 @@ import tensorflow.keras.callbacks as callbacks
 import tensorflow.keras.optimizers as optimizers
 
 from advanced import HistoryCheckpoint, non_local_block, TensorBoardBatch
-import img_utils
+# import img_utils
 from data_generator import read_img_dataset  # , DataGenerator, image_stitching_generator
-import prepare_stitching_data as psd
+import prepare_data as psd
 from sklearn.model_selection import train_test_split
 import constant as cfg
 
@@ -310,8 +310,10 @@ class BaseStitchingModel(object):
 
         print("Convolution image data point ready to be used: ", img_conv.shape)
 
-        model = self.create_model(height=h, width=w, load_weights=True)
-        if verbose: print("Model loaded.")
+
+        if not self.model:
+            self.model = self.create_model(height=h, width=w, load_weights=True)
+            if verbose: print("Model loaded.")
 
         # Create prediction for image patches
         print("Starting the image stitching prediction")

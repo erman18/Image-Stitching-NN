@@ -75,6 +75,8 @@ def stitch(files, model_type, outdir, scale_factor, compare_result=True):
 
     global panow
     global model
+    os.makedirs(m_outdir, exist_ok=True)
+    suffix = time.strftime("_%Y%m%d-%H%M%S")
     img_merge = panow.pano_stitch_single_camera(files, multi_band_blend=-5, return_img=True)
     # panow.print_config()
     if img_merge is None:
@@ -83,14 +85,14 @@ def stitch(files, model_type, outdir, scale_factor, compare_result=True):
 
     img_mbb = None
     if compare_result:
-        out_filename=os.path.join(outdir, "multiband_20_" + time.strftime("_%Y%m%d-%H%M%S") + ".jpg")
+        out_filename=os.path.join(outdir, "multiband_20_" + suffix + ".jpg")
         img_mbb = panow.pano_stitch_single_camera(files, out_filename=out_filename, multi_band_blend=20, return_img=True)
         img_mbb = img_mbb.astype(np.float32) * 255.
         img_mbb = np.clip(img_mbb, 0, 255).astype('uint8')
         img_mbb = img_mbb[0, :, :, :]
         print(f"=> Shape im_merge: {img_merge.shape}, shape of img_mbb: {img_mbb.shape}")
 
-    if model_type == "ddis":
+    if model_type == "ddis" or model_type == "unddis":
         # Pad image with zeros to the nearest power of 2
         h = nearest_mult_n(img_merge.shape[1]) - img_merge.shape[1]
         w = nearest_mult_n(img_merge.shape[2]) - img_merge.shape[2]
@@ -101,13 +103,13 @@ def stitch(files, model_type, outdir, scale_factor, compare_result=True):
 
     start_time = time.time()
     result = model.simple_stitch(img_merge, out_dir=outdir, scale_factor=scale_factor,
-                                 suffix=model_type, return_image=True)
+                                 suffix=model_type + str(suffix), return_image=True)
     print("--- %s seconds ---" % (time.time() - start_time))
 
     if compare_result:
         m_pnsr = calculate_psnr(img_mbb, result)
         m_ssim = calculate_ssim(img_mbb, result)
-        print(f"File {files[0]}: PNSR: {m_pnsr}, and SSIM: {m_ssim}")
+        print(f"PNSR: {m_pnsr}, and SSIM: {m_ssim}, Output Dir: {outdir}")
 
 
 parser = argparse.ArgumentParser(description="Up-Scales an image using Image Super Resolution Model")
@@ -157,7 +159,7 @@ def nearest_mult_n(m, n=4):
 args = parser.parse_args()
 print(args)
 model_type = str(args.model).lower()
-if not model_type in ["is", "eis", "dis", "ddis", "rnis", "distilled_rnis", "unrnis"]:
+if not model_type in ["is", "eis", "dis", "ddis", "rnis", "distilled_rnis", "unrnis", "unddis"]:
     raise ValueError('Model type must be either "is", "eis", "dis", '
                      '"ddis", "rnis" or "distilled_rnis", "unrnis"')
 
@@ -199,6 +201,8 @@ if __name__ == "__main__":
         model = model_stitching.ResNetStitch()
     elif model_type == "unrnis":  # Work
         model = SSL_models.ResNetStitch()
+    elif model_type == "unddis":  # Work
+        model = SSL_models.DeepDenoiseStitch()
     elif model_type == "distilled_rnis":  # Not Trained Yet
         # model = model_stitching.DistilledResNetStitch()
         print("The Distilled model has not been trained yet.")
@@ -224,62 +228,14 @@ if __name__ == "__main__":
         sys.exit()
 
     m_outdir = f"{cfg.dataset_folder}/out_result" if args.outdir is None else args.outdir
-    # if args.input_pattern is not None and args.nb_stitch_images:
-    #     for img_id in range(args.nb_stitch_images):
-
-    #         file_list = [args.input_pattern.format(camID=i, imgID=img_id) for i in range(args.nb_cameras)]
-            
-    #         img_merge = panow.pano_stitch_single_camera(file_list, multi_band_blend=-5, return_img=True)
-
-    #         if img_merge is None:
-    #             print(f"failed to stitch the images {files}")
-
-    # stitch(files, model_type=model_type, outdir=m_outdir, compare_result=args.compare_result, scale_factor=args.scale_factor)
-
 
     if args.dfs == "MCMI":
-        for file_list in files:
+        for idx, file_list in enumerate(files):
 
             # file_list = [args.input_pattern.format(camID=i, imgID=img_id) for i in range(args.nb_cameras)]
+            print(f"==> Processing Image {idx+1}/{len(files)}")
             stitch(file_list, model_type=model_type, outdir=m_outdir, compare_result=args.compare_result, scale_factor=args.scale_factor)
 
     else:
         stitch(files, model_type=model_type, outdir=m_outdir, compare_result=args.compare_result, scale_factor=args.scale_factor)
 
-    # # img_merge = panow.pano_stitch_single_camera(files, calib_files=files, multi_band_blend=-5, return_img=True)
-    # img_merge = panow.pano_stitch_single_camera(files, calib_files=None, multi_band_blend=-5, return_img=True)
-    # # panow.print_config()
-    # if img_merge is None:
-    #     print(f"failed to stitch the images {files}")
-    #     sys.exit()
-
-    # img_mbb = None
-    # if args.compare_result:
-    #     img_mbb = panow.pano_stitch_single_camera(files, calib_files=None, multi_band_blend=20, return_img=True)
-    #     img_mbb = img_mbb.astype(np.float32) * 255.
-    #     img_mbb = np.clip(img_mbb, 0, 255).astype('uint8')
-    #     img_mbb = img_mbb[0, :, :, :]
-    #     print(f"=> Shape im_merge: {img_merge.shape}, shape of img_mbb: {img_mbb.shape}")
-
-    # if model_type == "ddis":
-    #     # Pad image with zeros to the nearest power of 2
-    #     h = nearest_mult_n(img_merge.shape[1]) - img_merge.shape[1]
-    #     w = nearest_mult_n(img_merge.shape[2]) - img_merge.shape[2]
-    #     img_merge = np.pad(img_merge, ((0, 0), (0, h), (0, w), (0, 0)), mode='constant')
-    #     if args.compare_result:
-    #         img_mbb = np.pad(img_mbb, ((0, h), (0, w), (0, 0)), mode='constant')
-    #         print(f"=> New Shape im_merge: {img_merge.shape}, shape of img_mbb: {img_mbb.shape}")
-
-    # # print(img_merge.shape)
-    # # model.stitch(files, scale_factor=args.scale_factor, suffix=model_type)
-    # outdir = f"{cfg.dataset_folder}/out_result" if args.outdir is None else args.outdir
-
-    # start_time = time.time()
-    # result = model.simple_stitch(img_merge, out_dir=outdir, scale_factor=args.scale_factor,
-    #                              suffix=model_type, return_image=True)
-    # print("--- %s seconds ---" % (time.time() - start_time))
-
-    # if args.compare_result:
-    #     m_pnsr = calculate_psnr(img_mbb, result)
-    #     m_ssim = calculate_ssim(img_mbb, result)
-    #     print(f"File {files[0]}: PNSR: {m_pnsr}, and SSIM: {m_ssim}")
