@@ -16,10 +16,12 @@ pano_config_file = project_setting_dir + "/config.cfg"
 # Data preparation settings
 patch_size = 256
 patch_step = 64
+un_patch_size = 256 #Default: 512 Unsupervised patch size
+un_patch_step = 96 # Default: 256 Unsupervised step size
 sandfall_layer = -5
 
 config_img_input = project_setting_dir + "/config_input_file.json"
-config_img_output = project_setting_dir + "/config_output_file.json"
+config_img_output = image_folder + "/config_output_file.json"
 
 class Colors:
     """ ANSI color codes """

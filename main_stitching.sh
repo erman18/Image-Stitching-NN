@@ -32,7 +32,7 @@ DFS="MCMI"
 
 # # Data Test 4
 # IMGDIR=/home/smrtsyslab/projects/deepstitch-dataset/raw_data/Terrace/Calibration
-# OUTDIR=/home/smrtsyslab/projects/deepstitch-dataset/cvpr_result/Terrace2
+# OUTDIR=/home/smrtsyslab/projects/deepstitch-dataset/cvpr_result/Terrace3
 # CALIB_PATTERN=/home/smrtsyslab/projects/deepstitch-dataset/raw_data/Terrace/Input/{camID:05d}/{imgID:05d}.jpg
 # INPUT_PATTERN=/home/smrtsyslab/projects/deepstitch-dataset/raw_data/Terrace/Input/{camID:05d}/{imgID:05d}.jpg
 # DFS="MCMI"
@@ -53,13 +53,13 @@ DFS="MCMI"
 
 # # Data Test 6 --> Not matching features for this dataset. (GAUSS_WINDOW_FACTOR 3, RANSAC_INLIER_THRES 2.5)
 # # IMGDIR=/home/smrtsyslab/projects/deepstitch-dataset/raw_data/Windmills/Calibration
-# OUTDIR=/home/smrtsyslab/projects/deepstitch-dataset/cvpr_result/Windmills
+# OUTDIR=/home/smrtsyslab/projects/deepstitch-dataset/cvpr_result/Windmills2
 # INPUT_PATTERN=/home/smrtsyslab/projects/deepstitch-dataset/raw_data/Windmills/Input/{camID:05d}/{imgID:05d}.jpg
 # CALIB_PATTERN=/home/smrtsyslab/projects/deepstitch-dataset/raw_data/Windmills/Input/{camID:05d}/{imgID:05d}.jpg
 # NBC=5 # Number of camera
 # NBI=300 # Maximun number of images to use for calibration
 # NBIS=10 # Maximum number of image to use for image stitching
-# SCALE_FACTOR=3
+# SCALE_FACTOR=4
 
 # # Data Test 7
 # # IMGDIR=/home/smrtsyslab/projects/deepstitch-dataset/raw_data/Opera/Calibration
@@ -71,39 +71,39 @@ DFS="MCMI"
 # NBIS=10 # Maximum number of image to use for image stitching
 # SCALE_FACTOR=3
 
-# Data Test 8
-OUTDIR=/home/smrtsyslab/projects/deepstitch-dataset/cvpr_result/CMU0
-INPUT_PATTERN=/home/smrtsyslab/projects/deepstitch-dataset/raw_data/example-data/Campus/CMU0/medium{imgID:02d}.jpg
-NBIS=37 # Maximum number of image to use for image stitching
-DFS="SCMI"
-SCALE_FACTOR=2
+# # Data Test 8
+# OUTDIR=/home/smrtsyslab/projects/deepstitch-dataset/cvpr_result/CMU0/2
+# INPUT_PATTERN=/home/smrtsyslab/projects/deepstitch-dataset/raw_data/example-data/Campus/CMU0/medium{imgID:02d}.jpg
+# NBIS=37 # Maximum number of image to use for image stitching
+# DFS="SCMI"
+# SCALE_FACTOR=2
 
 # # Data Test 9
 # IMGDIR=/home/smrtsyslab/projects/deepstitch-dataset/raw_data/example-data/Campus/CMU1
-# OUTDIR=/home/smrtsyslab/projects/deepstitch-dataset/cvpr_result/CMU1/
+# OUTDIR=/home/smrtsyslab/projects/deepstitch-dataset/cvpr_result/CMU1/2
 # DFS="IDIR"
 # SCALE_FACTOR=2
 
-# # Data Test 10
-# IMGDIR=/home/smrtsyslab/projects/deepstitch-dataset/raw_data/own/homestreet
-# OUTDIR=/home/smrtsyslab/projects/deepstitch-dataset/cvpr_result/homestreet/
-# DFS="IDIR"
-# SCALE_FACTOR=1
+# Data Test 10
+IMGDIR=/home/smrtsyslab/projects/deepstitch-dataset/raw_data/UFCampus/UFWEST4
+OUTDIR=/home/smrtsyslab/projects/deepstitch-dataset/cvpr_result/UFWEST4/2
+DFS="IDIR"
+SCALE_FACTOR=3
 
 # # Data Test 11
-# IMGDIR=/home/smrtsyslab/projects/deepstitch-dataset/raw_data/own/oncampus
-# OUTDIR=/home/smrtsyslab/projects/deepstitch-dataset/cvpr_result/oncampus/
+# IMGDIR=/home/smrtsyslab/projects/deepstitch-dataset/raw_data/example-data/zijing
+# OUTDIR=/home/smrtsyslab/projects/deepstitch-dataset/cvpr_result/zijing/
 # DFS="IDIR"
-# SCALE_FACTOR=1
+# SCALE_FACTOR=3
 
 # # Data Test 12
-# IMGDIR=/home/smrtsyslab/projects/deepstitch-dataset/raw_data/own/physbuilding
-# OUTDIR=/home/smrtsyslab/projects/deepstitch-dataset/cvpr_result/physbuilding/
+# IMGDIR=/home/smrtsyslab/projects/deepstitch-dataset/raw_data/example-data/flower
+# OUTDIR=/home/smrtsyslab/projects/deepstitch-dataset/cvpr_result/flower/
 # DFS="IDIR"
 # SCALE_FACTOR=1
 
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$LIB_DIR/pano &&
 # Model: is, eis, dis, ddis, rnis, distilled_rnis (not yet trained)
 # New model: unrnis, unddis
-python main_stitching.py --imgdir $IMGDIR --outdir $OUTDIR --model unddis --calib_pattern $CALIB_PATTERN --input_pattern $INPUT_PATTERN \
+python main_stitching.py --imgdir $IMGDIR --outdir $OUTDIR --model unrnis --calib_pattern $CALIB_PATTERN --input_pattern $INPUT_PATTERN \
     -nbc $NBC -nbi $NBI -nbis $NBIS --scale_factor=$SCALE_FACTOR --dfs=$DFS --files=$FILES

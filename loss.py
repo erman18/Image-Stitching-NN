@@ -163,11 +163,14 @@ class TVRegularizer(Regularizer):
     def __call__(self, x):
         assert K.ndim(x.output) == 4
         x_out = x.output
-        if K.image_dim_ordering() == 'th':
-            a = K.square(x_out[:, :, :self.img_width - 1, :self.img_height - 1] - x_out[:, :, 1:, :self.img_height - 1])
-            b = K.square(x_out[:, :, :self.img_width - 1, :self.img_height - 1] - x_out[:, :, :self.img_width - 1, 1:])
-        else:
-            a = K.square(x_out[:, :self.img_width - 1, :self.img_height - 1, :] - x_out[:, 1:, :self.img_height - 1, :])
-            b = K.square(x_out[:, :self.img_width - 1, :self.img_height - 1, :] - x_out[:, :self.img_width - 1, 1:, :])
+        # if K.image_dim_ordering() == 'th':
+        #     a = K.square(x_out[:, :, :self.img_width - 1, :self.img_height - 1] - x_out[:, :, 1:, :self.img_height - 1])
+        #     b = K.square(x_out[:, :, :self.img_width - 1, :self.img_height - 1] - x_out[:, :, :self.img_width - 1, 1:])
+        # else:
+        #     a = K.square(x_out[:, :self.img_width - 1, :self.img_height - 1, :] - x_out[:, 1:, :self.img_height - 1, :])
+        #     b = K.square(x_out[:, :self.img_width - 1, :self.img_height - 1, :] - x_out[:, :self.img_width - 1, 1:, :])
+        
+        a = K.square(x_out[:, :self.img_width - 1, :self.img_height - 1, :] - x_out[:, 1:, :self.img_height - 1, :])
+        b = K.square(x_out[:, :self.img_width - 1, :self.img_height - 1, :] - x_out[:, :self.img_width - 1, 1:, :])
         loss = self.weight * K.mean(K.sum(K.pow(a + b, 1.25)))
         return loss

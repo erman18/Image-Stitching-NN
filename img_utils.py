@@ -9,7 +9,7 @@ from scipy.ndimage.filters import gaussian_filter
 
 import patchify
 
-from keras import backend as K
+from tensorflow.keras import backend as K
 
 import os
 import time
@@ -25,10 +25,11 @@ import constant as cfg
 # from hparams import hparams
 hparams = {'input_size': (512, 512, 3),
            'batch_size': 4,
-           'content_weight': 1e-3, # 1e-5,
-           'style_weight': 4e-9, # 4e-9,
+           'content_weight': 1e-2, # 1e-5,
+           'style_weight': 4e-8, # 4e-9,
            'simple_weight': 2e-3, # 4e-5, # 4e-9,
            'gradient_weight': 4e-1,
+           'tv_weight': 4e-9,
            'learning_rate': 0.001,
            'residual_filters': 128,
            'residual_layers': 5,
@@ -70,6 +71,12 @@ def gram_matrix(input_tensor):
 def content_loss(content, output):
     return tf.reduce_mean((content-output)**2)
 
+def total_variation_loss(content):
+    a = K.square(content[:, :-1, :-1, :] - content[:, 1:, :-1, :])
+    b = K.square(content[:, :-1, :-1, :] - content[:, :-1, 1:, :])
+    loss = K.mean(K.sum(K.pow(a + b, 1.25)))
+    return loss
+
 def gradient_loss(content, output):
     "Ensure the smoothness of the images"
 
@@ -90,9 +97,14 @@ def gradient_loss(content, output):
 
     return tf.reduce_mean(lx + ly)
 
-def style_loss(style, output):
+def style_loss(target_feature_maps, output_feature_maps):
+
+    # Get output gram_matrix
+    target_gram_matrices = [gram_matrix(x) for x in target_feature_maps]
+    output_gram_matrices = [gram_matrix(x) for x in output_feature_maps]
+    num_style_layers = len(target_feature_maps)
     return tf.add_n([tf.reduce_mean((style_feat-out_feat)**2) 
-                        for style_feat, out_feat in zip(style, output)])
+                        for style_feat, out_feat in zip(target_gram_matrices, output_gram_matrices)]) / num_style_layers
 
 def save_hparams(model_name):
     json_hparams = json.dumps(hparams)

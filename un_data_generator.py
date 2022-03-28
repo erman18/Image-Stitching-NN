@@ -80,6 +80,7 @@ class DataGenerator(keras.utils.Sequence):
 
         # print("Adjusted index", adj_idx)
         total_imgs = self.config_data[str(dataset_id)]["nb_imgs"]
+        nb_cameras = self.config_data[str(dataset_id)]["nb_cameras"]
 
         img_idx, patch_id = divmod(adj_idx, self.total_patch_per_img[dataset_id])
         patchx_id, patchy_id = divmod(patch_id, self.config_data[str(dataset_id)]["patchY"])
@@ -87,7 +88,7 @@ class DataGenerator(keras.utils.Sequence):
         # img_idx, patch_id = divmod(adj_idx, self.config_data[str(dataset_id)]["patchX"])
         # patchx_id, patchy_id = divmod(patch_id, self.config_data[str(dataset_id)]["patchY"])
 
-        return dataset_id, patchx_id, patchy_id, img_idx, total_imgs
+        return dataset_id, patchx_id, patchy_id, img_idx, total_imgs, nb_cameras
 
     def __data_generation(self, list_ids_temp):
         """Generates data containing batch_size samples"""  # X : (n_samples, *dim, n_channels)
@@ -101,9 +102,9 @@ class DataGenerator(keras.utils.Sequence):
         # Generate data
         for i, ID in enumerate(list_ids_temp):
             # Store sample
-            dataset_id, patchx_id, patchy_id, img_idx, total_imgs = self.__get_dataset_patch(ID)
+            dataset_id, patchx_id, patchy_id, img_idx, total_imgs, nb_cameras = self.__get_dataset_patch(ID)
             ts = psd.TrainingSample(datasetID=dataset_id, imgID=img_idx, patchX=patchx_id,
-                                    patchY=patchy_id, image_folder=cfg.image_folder)
+                                    patchY=patchy_id, image_folder=cfg.image_folder, nb_cameras=nb_cameras)
 
             if os.path.exists(ts.get_sample_path()):
                 print(f"==> index: {ID}, {ts.get_sample_path()}, check: {os.path.exists(ts.get_sample_path())}")
@@ -124,8 +125,8 @@ class DataGenerator(keras.utils.Sequence):
         # Generate data
         for i, ID in enumerate(list_ids):
             # Store sample
-            dataset_id, patchx_id, patchy_id, img_id, total_imgs = self.__get_dataset_patch(ID)
-            X.append((dataset_id, patchx_id, patchy_id, img_id, total_imgs))
+            dataset_id, patchx_id, patchy_id, img_id, total_imgs, nb_cameras = self.__get_dataset_patch(ID)
+            X.append((dataset_id, patchx_id, patchy_id, img_id, total_imgs, nb_cameras))
 
         return X
 
@@ -136,9 +137,9 @@ class DataGenerator(keras.utils.Sequence):
         # Store sample
         paths = []
         for ID in index_list:
-            dataset_id, patchx_id, patchy_id, img_idx, total_imgs = self.__get_dataset_patch(ID)
+            dataset_id, patchx_id, patchy_id, img_idx, total_imgs, nb_cameras = self.__get_dataset_patch(ID)
             ts = psd.TrainingSample(datasetID=dataset_id, imgID=img_idx, patchX=patchx_id,
-                                patchY=patchy_id, image_folder=cfg.image_folder)
+                                patchY=patchy_id, image_folder=cfg.image_folder, nb_cameras=nb_cameras)
 
             paths.append(ts.get_sample_path())
             if not os.path.exists(ts.get_sample_path()):
@@ -163,10 +164,10 @@ class DataGenerator(keras.utils.Sequence):
 ## Loading function for self-supervised training
 def un_load_data_sample(img_paths, dim, n_channels, training_folder):
 
-    dataset_id, patchx_id, patchy_id, img_id, total_imgs = img_paths
+    dataset_id, patchx_id, patchy_id, img_id, total_imgs, nb_cameras = img_paths
 
     ts = psd.TrainingSample(datasetID=dataset_id, imgID=img_id, patchX=patchx_id,
-                            patchY=patchy_id, image_folder=training_folder.decode("utf-8"))
+                            patchY=patchy_id, image_folder=training_folder.decode("utf-8"), nb_cameras=nb_cameras)
     X = ts.load_sample()
     y = ts.load_target()
     # print("===================================", X.shape)

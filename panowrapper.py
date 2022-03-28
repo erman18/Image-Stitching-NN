@@ -5,6 +5,7 @@ import sys
 import time
 
 import numpy as np
+import random
 
 import constant as cfg
 import cv2
@@ -38,11 +39,14 @@ class PanoWrapper:
     def is_pano_initialize(self):
         return self.pano_stitch_init
 
-    def init_pano_stitcher(self, calib_files, multi_band_blend):
+    def init_pano_stitcher(self, calib_files, multi_band_blend, shuffle=True):
 
         for img_path in calib_files:
             if not os.path.isfile(img_path):
                 raise ValueError(f"Error: Image file {img_path} does not exists")
+
+        # if shuffle:
+        #     random.shuffle(calib_files)
 
         pano_stitch = pano.Stitcher(calib_files)
         self.pano_stitch_init = False
@@ -89,11 +93,13 @@ class PanoWrapper:
             raise RuntimeError("Failed to find the projection parameters. Please add calibration "
                                "images in the same director as the images")
 
-    def build_pano(self, img_paths, multi_band_blend):
+    def build_pano(self, img_paths, multi_band_blend, shuffle=True):
         if not self.pano_stitch: return None
         for img_path in img_paths:
             if not os.path.isfile(img_path):
                 raise ValueError(f"Error: Image file {img_path} does not exists")
+        # if shuffle:
+        #     random.shuffle(img_paths)
         mat = self.pano_stitch.build_from_new_images(img_paths, multi_band_blend)
         return mat
 
@@ -141,13 +147,14 @@ class PanoWrapper:
 
         if return_img:
             p = np.array(mat, copy=False)
+            non_zeros_pixel = np.count_nonzero(p)
             p[p < 0] = 0  # Replace negative values with zeros
             p[p > 1] = 1  # Replace negative values with zeros
             h, w, c = p.shape
             X = np.zeros((1, h, w, c))
 
             X[0, :, :, :c] = p
-            print("********++++==> ", X.shape, " ~ ", p.dtype, ", multi_band_blend: ", multi_band_blend)
+            print("********++++==> ", X.shape, " ~ ", p.dtype, ", non_zeros_pixels: ", non_zeros_pixel, ", multi_band_blend: ", multi_band_blend)
             return X
 
 if __name__ == "__main__":

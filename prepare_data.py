@@ -8,6 +8,9 @@ import time
 
 import numpy as np
 # from cv2 import imwrite, imread
+import random
+
+from sklearn.utils import shuffle
 
 import img_utils
 import constant as cfg
@@ -30,8 +33,10 @@ def dict_raise_on_duplicates(ordered_pairs):
     return d
 
 
-def write_json_file(filename, data):
-    with open(filename, 'w') as fp:
+def write_json_file(filename, data, mode="w+"):
+    if mode == 'w+':
+        os.makedirs(os.path.dirname(filename), exist_ok=True)
+    with open(filename, mode) as fp:
         json.dump(data, fp, indent=4)
 
 
@@ -65,69 +70,98 @@ def remove_file(filename):
 
 
 class TrainingSample:
-    def __init__(self, datasetID, imgID, patchX, patchY, image_folder):
+    def __init__(self, datasetID, imgID, patchX, patchY, image_folder, nb_cameras=None):
         # self.sample_id = sampleID
         self.datasetID = datasetID
         self.img_id = imgID
         self.patch_x = patchX
         self.patch_y = patchY
+        self.nb_cameras = nb_cameras
 
         self.dataset_path = f"{image_folder}/{datasetID}"
         self.sample_folder = f"{self.dataset_path}/X"
         self.target_folder = f"{self.dataset_path}/y"
 
-        self.sample_path = f"{self.sample_folder}/imgID{self.img_id}_patchID{self.patch_x}_{self.patch_y}"
-        self.target_path = f"{self.target_folder}/imgID{self.img_id}_patchID{self.patch_x}_{self.patch_y}"
-
     def get_sample_path(self):
+        self.sample_path = f"{self.sample_folder}/imgID{self.img_id}_patchID{self.patch_x}_{self.patch_y}"
         return f"{self.sample_path}.npz"
 
     def get_target_path(self):
+        # if camera_id:
+        #     if not 0 < camera_id < self.nb_cameras:
+        #         cfg.PRINT_WARNING(f"Camera ID is out of range: camera_id: {camera_id}, self.nb_cameras: {self.nb_cameras}")
+        #     # Unsupervised target path
+        #     self.target_path = f"{self.target_folder}/imgID{self.img_id}_camID{camera_id}_patchID{self.patch_x}_{self.patch_y}"
+        # else:
+        #     self.target_path = f"{self.target_folder}/imgID{self.img_id}_patchID{self.patch_x}_{self.patch_y}"
+        self.target_path = f"{self.target_folder}/imgID{self.img_id}_patchID{self.patch_x}_{self.patch_y}"
         return f"{self.target_path}.npz"
 
-    def save_sample(self, data):
-        # np.save(f"{self.sample_path}.npy", data)
+    def save_sample(self, data, shuffle=True):
+        if shuffle:
+            # Total number of channels
+            c = data.shape[-1]
+            # Number of layers
+            n = np.abs(cfg.sandfall_layer)
+            # Shuffle layer order on the training samples
+            data[:, :, np.arange(c)] = data[:, :, np.random.permutation(np.arange(c).reshape(n,3)).ravel()]
         np.savez_compressed(self.get_sample_path(), data=data)
 
-    def save_target(self, data):
-        # np.save(f"{self.target_path}.npy", data)
+    def save_target(self, data, shuffle=True):
+        if shuffle:
+            # Total number of channels
+            c = data.shape[-1]
+            # Number of images
+            n = int(c / 3)
+            # Shuffle layer order on the training samples
+            data[:, :, np.arange(c)] = data[:, :, np.random.permutation(np.arange(c).reshape(n,3)).ravel()]
         np.savez_compressed(self.get_target_path(), data=data)
 
     def load_sample(self):
-        # np.load(f"{self.sample_path}.npy")
         return np.load(self.get_sample_path())["data"]
 
     def load_target(self):
-        # return np.load(f"{self.target_path}.npy")
         return np.load(self.get_target_path())["data"]
 
 
 class Dataset:
     def __init__(self, datasetID, total_img, nb_cameras, nb_img_generate, img_pattern,
-                 image_folder, data_settings=None):
+                 image_folder, imgfs="MCMI", input_img_dir=None, scale_factor=1.0, data_settings=None):
         """
         Class to Generate the dataset from Pano Stitcher
         :param datasetID:
         :param size_x: patch_x size
         :param size_y: patch_y size
         :param nb_cameras: total number of cameras for this dataset
+        :param scale_factor: Scale factor to resize the output images
         :param nb_img_generate: total number of image to generate
         :param total_img: total number of images for this dataset
         :param img_pattern: image pattern to retrieve image files on disk. This pattern is
             a python f-string and should contain the camera id and the image id fields
             Example: Terrace/Input/{camID:05d}/{imgID:05d}.jpg
         :param image_folder: Training folder to store images
+        :param input_img_dir: The input image directory if provided
+        :param imgfs: Image File Structure (DFS) 
+                        "MCMI: Multi-Camera Multi-Image (indicate both the 'camID' and the 'imgID' in the file pattern \n"
+                        "SCMI: Single-Camera Multi-Image ('imgID' in the file pattern"
+                        "MCSI: Multi-Camera Multi-Image ('camID' in the file pattern"
+                        "LIST: list of files image to stitch and provide the list in the --files param"
+                        "IDIR: Image Directory of files with *.jpg, *.jpeg, *.png, and *.bmp will be retrieve in the folder indicate by --imgdir"
         :param data_settings: Default: None. Dictionary of the data setting for this dataset
         """
         self.dataset_id = datasetID
         self.total_img = total_img
+        self.imgfs = imgfs
         self.img_pattern = img_pattern
+        self.input_img_dir = input_img_dir
         self.nb_cameras = nb_cameras
+        self.scale_factor = scale_factor
         self.nb_img_generate = nb_img_generate
         self.dataset_path = f"{image_folder}/{datasetID}"
         self.target_img_path = f"{self.dataset_path}/target"
         self.sample_folder = f"{self.dataset_path}/X"
         self.target_path = f"{self.dataset_path}/y"
+        # self.__is_supervised = True # By default the data are generated for supervised training
 
         self.dataset_settings = data_settings
         if "total_dataset" not in self.dataset_settings:
@@ -139,6 +173,8 @@ class Dataset:
         if str(self.dataset_id) not in self.dataset_settings:
             self.dataset_settings[str(self.dataset_id)] = {
                 "nb_imgs": 0,
+                "nb_cameras": self.nb_cameras,
+                "scale_factor": self.scale_factor,
                 "patchX": 0,
                 "patchY": 0,
                 "patchSizeX": cfg.patch_size,
@@ -170,51 +206,174 @@ class Dataset:
             self.dataset_settings[str(self.dataset_id)][key] = value
 
     def generate_dataset(self):
+        """Generate dataset for the supervised training"""
 
-        panow = pw.PanoWrapper()
+        panow = pw.PanoWrapper(scale_factor=self.scale_factor)
 
-        # Trying to find the optimal projection matrix
-        # by initializing the pano stitcher object 
-        for img_id in range(self.total_img):
+        if self.imgfs == "MCMI":
+            # Trying to find the optimal projection matrix
+            # by initializing the pano stitcher object 
+            for img_id in range(self.total_img):
 
-            file_list = [self.img_pattern.format(camID=i, imgID=img_id) for i in range(self.nb_cameras)]
+                file_list = [self.img_pattern.format(camID=i, imgID=img_id) for i in range(self.nb_cameras)]
 
-            print(file_list)
+                print(file_list)
+                try:
+                    panow.init_pano_stitcher(file_list, multi_band_blend=cfg.sandfall_layer)
+                    break
+                except:
+                    print(f"Error: Cannot stitch image [{img_id}]")
+
+            if not panow.is_pano_initialize():
+                raise RuntimeError("Failed to find the projection parameters. Please add calibration "
+                                "images in the same director as the images")
+
+            sample_img_id = random.sample(range(self.total_img), self.nb_img_generate)
+
+            for img_id in sample_img_id:
+                file_list = [self.img_pattern.format(camID=i, imgID=img_id) for i in range(self.nb_cameras)]
+
+                print(file_list)
+                mat_merge = panow.build_pano(file_list, multi_band_blend=cfg.sandfall_layer)
+                pmat_merge = self.__convert_mat_np(mat_merge)
+                mat_target = panow.build_pano(file_list, multi_band_blend=20)
+                pmat_target = self.__convert_mat_np(mat_target)
+                panow.write_img(f'{self.target_img_path}/tgID{self.get_dataset_settings("nb_imgs")}.jpg', mat_target)
+
+                self.write_sample(self.get_dataset_settings("nb_imgs"), pmat_merge, pmat_target, cfg.patch_step,
+                                cfg.patch_size)
+
+        else:
+            files = []
+            if self.imgfs == "SCMI":
+                files = [self.img_pattern.format(imgID=img_id) for img_id in range(self.nb_img_generate)]
+            elif self.imgfs == "MCSI":
+                files = [self.img_pattern.format(camID=i) for i in range(self.nb_cameras)]
+            elif self.imgfs == "IDIR":
+                exts = ["jpg", "jpeg", "png", "bmp"]
+                for ext in exts:
+                    import re
+                    files.extend([os.path.join(self.input_img_dir, filename) 
+                    for filename in os.listdir(self.input_img_dir) if re.search(r'\.' + ext + '$', filename, re.IGNORECASE)])
+                    # files.extend(glob.glob(os.path.join(self.input_img_dir, ext)))
+            else:
+                ValueError("Please indicate the dataset file structure for your images") 
+            self.nb_cameras = len(files)
+            self.dataset_settings["nb_cameras"] = self.nb_cameras
+
             try:
-                panow.init_pano_stitcher(file_list, multi_band_blend=cfg.sandfall_layer)
-                break
+                panow.init_pano_stitcher(files, multi_band_blend=cfg.sandfall_layer)
             except:
-                print(f"Error: Cannot stitch image [{img_id}]")
+                print(f"Error: Cannot stitch image [{files}]")
 
-        if not panow.is_pano_initialize():
-            raise RuntimeError("Failed to find the projection parameters. Please add calibration "
-                               "images in the same director as the images")
+            if not panow.is_pano_initialize():
+                raise RuntimeError("Failed to find the projection parameters. Please add calibration "
+                                "images in the same director as the images")
 
-        import random
-        sample_img_id = random.sample(range(self.total_img), self.nb_img_generate)
-
-        for img_id in sample_img_id:
-            file_list = [self.img_pattern.format(camID=i, imgID=img_id) for i in range(self.nb_cameras)]
-
-            print(file_list)
-            mat_merge = panow.build_pano(file_list, multi_band_blend=cfg.sandfall_layer)
+            print(files)
+            mat_merge = panow.build_pano(files, multi_band_blend=cfg.sandfall_layer)
             pmat_merge = self.__convert_mat_np(mat_merge)
-            mat_target = panow.build_pano(file_list, multi_band_blend=0)
+            mat_target = panow.build_pano(files, multi_band_blend=20)
             pmat_target = self.__convert_mat_np(mat_target)
             panow.write_img(f'{self.target_img_path}/tgID{self.get_dataset_settings("nb_imgs")}.jpg', mat_target)
 
             self.write_sample(self.get_dataset_settings("nb_imgs"), pmat_merge, pmat_target, cfg.patch_step,
-                              cfg.patch_size)
+                            cfg.patch_size)
+
+    def generate_un_dataset(self):
+        """Generate Dataset for Unsupervised Training"""
+
+        # self.__is_supervised = False
+        panow = pw.PanoWrapper(scale_factor=self.scale_factor)
+
+        if self.imgfs == "MCMI":
+            # Trying to find the optimal projection matrix
+            # by initializing the pano stitcher object 
+            for img_id in range(self.total_img):
+
+                file_list = [self.img_pattern.format(camID=i, imgID=img_id) for i in range(self.nb_cameras)]
+
+                print(file_list)
+                try:
+                    panow.init_pano_stitcher(file_list, multi_band_blend=cfg.sandfall_layer)
+                    break
+                except:
+                    print(f"Error: Cannot stitch image [{img_id}]")
+
+            if not panow.is_pano_initialize():
+                raise RuntimeError("Failed to find the projection parameters. Please add calibration "
+                                "images in the same director as the images")
+
+            sample_img_id = random.sample(range(self.total_img), self.nb_img_generate)
+
+            for img_id in sample_img_id:
+                file_list = [self.img_pattern.format(camID=i, imgID=img_id) for i in range(self.nb_cameras)]
+
+                print("File list: ", file_list)
+                mat_merge = panow.build_pano(file_list, multi_band_blend=cfg.sandfall_layer)
+                pmat_merge = self.__convert_mat_np(mat_merge)
+
+                mat_multiband = panow.build_pano(file_list, multi_band_blend=20)
+                panow.write_img(f'{self.target_img_path}/tgID{self.get_dataset_settings("nb_imgs")}.jpg', mat_multiband)
+
+                mat_target = panow.build_pano(file_list, multi_band_blend=-1)
+                pmat_target = self.__convert_mat_np(mat_target)
+
+                self.write_sample(self.get_dataset_settings("nb_imgs"), pmat_merge, pmat_target, cfg.un_patch_step,
+                                cfg.un_patch_size)
+
+        else:
+            files = []
+            if self.imgfs == "SCMI":
+                files = [self.img_pattern.format(imgID=img_id) for img_id in range(self.nb_img_generate)]
+            elif self.imgfs == "MCSI":
+                files = [self.img_pattern.format(camID=i) for i in range(self.nb_cameras)]
+            elif self.imgfs == "IDIR":
+                exts = ["jpg", "jpeg", "png", "bmp"]
+                for ext in exts:
+                    import re
+                    files.extend([os.path.join(self.input_img_dir, filename) 
+                    for filename in os.listdir(self.input_img_dir) if re.search(r'\.' + ext + '$', filename, re.IGNORECASE)])
+                    # files.extend(glob.glob(os.path.join(self.input_img_dir, ext)))
+            else:
+                ValueError("Please indicate the dataset file structure for your images") 
+            self.nb_cameras = len(files)
+            # self.dataset_settings["nb_cameras"] = self.nb_cameras
+            self.set_dataset_settings("nb_cameras", self.nb_cameras)
+
+            try:
+                panow.init_pano_stitcher(files, multi_band_blend=cfg.sandfall_layer)
+            except:
+                print(f"Error: Cannot stitch image [{files}]")
+
+            if not panow.is_pano_initialize():
+                raise RuntimeError("Failed to find the projection parameters. Please add calibration "
+                                "images in the same director as the images")
+
+            print(files)
+            mat_merge = panow.build_pano(files, multi_band_blend=cfg.sandfall_layer)
+            pmat_merge = self.__convert_mat_np(mat_merge)
+
+            mat_multiband = panow.build_pano(files, multi_band_blend=20)
+            panow.write_img(f'{self.target_img_path}/tgID{self.get_dataset_settings("nb_imgs")}.jpg', mat_multiband)
+
+            mat_target = panow.build_pano(files, multi_band_blend=-1)
+            pmat_target = self.__convert_mat_np(mat_target)
+
+            self.write_sample(self.get_dataset_settings("nb_imgs"), pmat_merge, pmat_target, cfg.un_patch_step,
+                            cfg.un_patch_size)
 
     def write_sample(self, img_id, img, target, step, patch_size):
 
         img_patches = img_utils.make_raw_patches(img, step=step, patch_size=patch_size, channels=img.shape[-1],
                                                  verbose=1)
-        target_patches = img_utils.make_raw_patches(target, step=step, patch_size=patch_size, channels=3, verbose=1)
+        target_patches = img_utils.make_raw_patches(target, step=step, patch_size=patch_size, channels=target.shape[-1], verbose=1)
 
-        print(img_patches.shape)
+        print("Patches shape: ", img_patches.shape, ", target.shape: ", target.shape)
         self.set_dataset_settings("patchX", img_patches.shape[0])
         self.set_dataset_settings("patchY", img_patches.shape[1])
+        self.set_dataset_settings("patchSizeX", patch_size)
+        self.set_dataset_settings("patchSizeY", patch_size)
         self.increment_settings("nb_imgs", 1)
         self.dataset_settings["total_samples"] += img_patches.shape[0]*img_patches.shape[1]
 
@@ -223,7 +382,7 @@ class Dataset:
             target_patch = target_patches[patchIdx, patchIdy, 0, :, :]
 
             train_sample_obj = TrainingSample(datasetID=self.dataset_id, imgID=img_id, patchX=patchIdx,
-                                              patchY=patchIdy, image_folder=cfg.image_folder)
+                                              patchY=patchIdy, image_folder=cfg.image_folder, nb_cameras=self.nb_cameras)
 
             train_sample_obj.save_sample(img_patch)
             train_sample_obj.save_target(target_patch)
@@ -241,29 +400,48 @@ class Dataset:
         return
 
 
-def prepare_data_live():
+def prepare_data_live(args):
     """Prepare data set for image stitching"""
 
+    print("Argument: ", args, " - is supervised? ", args.supervised)
     data_file_settings = read_json_file(cfg.config_img_input)
 
     config_output_file = read_json_file(cfg.config_img_output)
 
     print(data_file_settings)
+    global_scale_factor = data_file_settings.get("global_scale_factor", 1.0)
     for datasetID, dataset_dc in data_file_settings.items():
-        print("datasetID", datasetID, "dataset_dc", dataset_dc)
+        print("datasetID", datasetID, ", dataset_dc", dataset_dc)
+        # continue
 
         total_img = dataset_dc.get("total_img", 0)
         nb_cameras = dataset_dc.get("nb_cameras", 0)
         nb_img_generate = dataset_dc.get("nb_img_generate", 0)
         img_pattern = dataset_dc.get("img_pattern", None)
+        input_img_dir = dataset_dc.get("input_img_dir", None)
+        imgfs = dataset_dc.get("IMGFS", "MCMI")
+        scale_factor = dataset_dc.get("scale_factor", 1.0)
         image_folder = cfg.image_folder
-        print("==>", img_pattern)
-        ds = Dataset(datasetID, total_img, nb_cameras, nb_img_generate, img_pattern, image_folder,
-                     config_output_file)
-        ds.generate_dataset()
+        # print("==>", img_pattern)
+        # scale_factor = scale_factor*2 if args.supervised else scale_factor*2
+        scale_factor = scale_factor*global_scale_factor
+        ds = Dataset(datasetID, total_img, nb_cameras, nb_img_generate, img_pattern, image_folder, imgfs,
+                     input_img_dir, scale_factor, config_output_file)
+
+        if args.supervised:
+            ds.generate_dataset()
+        else:
+            ds.generate_un_dataset()
 
 if __name__ == "__main__":
-    prepare_data_live()
+
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--supervised', default=True, type=lambda x: (str(x).lower() in ['true', '1', 'yes']))
+
+    args = parser.parse_args()
+
+    prepare_data_live(args)
 
     # import libpyopenpano as pano
     # # help(pano)

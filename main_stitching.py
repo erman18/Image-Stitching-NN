@@ -77,11 +77,18 @@ def stitch(files, model_type, outdir, scale_factor, compare_result=True):
     global model
     os.makedirs(m_outdir, exist_ok=True)
     suffix = time.strftime("_%Y%m%d-%H%M%S")
+    img_merge = panow.pano_stitch_single_camera(files, multi_band_blend=-1, return_img=True)
     img_merge = panow.pano_stitch_single_camera(files, multi_band_blend=-5, return_img=True)
     # panow.print_config()
     if img_merge is None:
         print(f"failed to stitch the images {files}")
         sys.exit()
+
+    # Save SandFall layers
+    for i in range(abs(cfg.sandfall_layer)):
+        filename = os.path.join(outdir, "sandfall_layer" + str(i) + ".jpg")
+        img = img_merge[0, :,:, i*3:(i+1)*3]
+        cv2.imwrite(filename, cv2.cvtColor((img*255).astype(np.uint8), cv2.COLOR_RGB2BGR))
 
     img_mbb = None
     if compare_result:
@@ -181,10 +188,13 @@ if __name__ == "__main__":
     elif args.dfs == "LIST":
         files = args.files
     elif args.dfs == "IDIR":
+        import re
         # exts = ["*.jpg", "*.jpeg", "*.png", "*.bmp", "*.gif"]
-        exts = ["*.jpg", "*.jpeg", "*.png", "*.bmp"]
+        exts = ["jpg", "jpeg", "png", "bmp"]
         for ext in exts:
-            files.extend(glob.glob(os.path.join(args.imgdir, ext)))
+            files.extend([os.path.join(args.imgdir, filename) 
+            for filename in os.listdir(args.imgdir) if re.search(r'\.' + ext + '$', filename, re.IGNORECASE)])
+            # files.extend(glob.glob(os.path.join(args.imgdir, ext)))
         print(files)
     else:
         ValueError("Please indicate the dataset file structure for your images")
