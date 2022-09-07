@@ -1,6 +1,6 @@
-# Super Resolution Framework
+# Image Stitching Framework
 
-Command to export conda environment files
+## Command to export conda environment files
 
 The first environment is not cross-platform compatible:
 
@@ -11,19 +11,22 @@ from the previous generate files.
 
 `conda env export --from-history --no-builds | grep -v "^prefix: " > environment2.yml`
 
-Install packages
+## Install packages
 
 `conda env create -f environment2.yml`
 
-Installation of OpenCV
+## Installation of OpenCV
 
 ```
 conda config --add channels conda-forge
 conda install libopencv opencv py-opencv
 ```
 
-All command to manually install the environment `tensorflow_envs2`
-```angular2html
+## All command to manually install the environment `tensorflow_envs2`
+```
+Check Tensorflow compatibility link with Cuda for GPU: https://www.tensorflow.org/install/source
+https://neptune.ai/blog/installing-tensorflow-2-gpu-guide
+
 conda create --name tensorflow_envs2
 conda activate tensorflow_envs2
 

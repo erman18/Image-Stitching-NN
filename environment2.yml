@@ -16,5 +16,7 @@ dependencies:
   - python=3.8.8
   - python-graphviz
   - pip
+  - matplotlib 
+  - tqdm
   - pip:
     - patchify==0.2.3

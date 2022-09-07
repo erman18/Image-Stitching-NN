@@ -1,4 +1,4 @@
-name: tensorflow_envs2
+name: tensorflow_envs3
 channels:
   - conda-forge
   - defaults
@@ -154,10 +154,10 @@ dependencies:
   - pyopenssl=20.0.1
   - pyparsing=2.4.7
   - pysocks=1.7.1
-  - python=3.9.6
+  - python=3.8
   - python-flatbuffers=1.12
   - python-graphviz=0.17
-  - python_abi=3.9
+  - python_abi=3.8
   - pyyaml=5.4.1
   - qt=5.12.9
   - readline=8.1
@@ -203,5 +203,6 @@ dependencies:
   - zipp=3.5.0
   - zlib=1.2.11
   - zstd=1.4.9
+  - tqdm
   - pip:
     - patchify==0.2.3

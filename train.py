@@ -2,10 +2,8 @@ from __future__ import print_function, division
 
 import argparse
 
-from keras.utils.vis_utils import plot_model
-import model_stitching
-import img_utils
-import project_settings as cfg
+from tensorflow.keras.utils import plot_model
+import constant as cfg
 
 from model_stitching import DeepDenoiseStitch as DDStitch
 from model_stitching import DistilledResNetStitch as DResStitch
@@ -13,6 +11,10 @@ from model_stitching import ResNetStitch as ResNetStitch
 from model_stitching import ImageStitchingModel as DPImgStitch
 from model_stitching import ExpantionStitching as ExpStitch
 from model_stitching import DenoisingAutoEncoderStitch as DAutoEncoderStitch
+from SSL_models import ResNetStitch as UnResNetStitch
+from SSL_models import DeepDenoiseStitch as UnDDStitch
+from SSL_models import VGGLossNetwork
+from loss import PNSRMetric, SSIMMetric
 
 model_directory = {'DDStitch': DDStitch,
                    'DResStitch': DResStitch,
@@ -20,12 +22,16 @@ model_directory = {'DDStitch': DDStitch,
                    'DPImgStitch': DPImgStitch,
                    'ExpStitch': ExpStitch,
                    'DAutoEncoderStitch': DAutoEncoderStitch,
+                   'UnResNetStitch': UnResNetStitch,
+                   'UnDDStitch': UnDDStitch,
                    }
 
 parser = argparse.ArgumentParser()
-# parser.add_argument('--model_dir', default='experiments/base_model', help="Directory containing params.json")
+parser.add_argument('--model_dir', default='experiments/base_model', help="Directory containing params.json")
 parser.add_argument('--model', default="DDStitch", help="Deep Denoise Stitching Model", type=str)
 parser.add_argument('--load_weights', default=True, type=lambda x: (str(x).lower() in ['true', '1', 'yes']))
+parser.add_argument('--save_model_img', default=True, type=lambda x: (str(x).lower() in ['true', '1', 'yes']))
+parser.add_argument('--supervised', default=True, type=lambda x: (str(x).lower() in ['true', '1', 'yes']))
 parser.add_argument('--nb_epochs', default=10, type=int)
 parser.add_argument('--batch_size', default=32, type=int)
 parser.add_argument('--restore_file', default=None,
@@ -47,7 +53,419 @@ def train(height, width, nb_epochs=10, batch_size=32, save_arch=False, load_weig
         plot_model(stitch_model.model, to_file=f"architectures/model_img/{model_name}.png", show_shapes=True,
                    show_layer_names=True)
 
+
     stitch_model.fit(nb_epochs=nb_epochs, batch_size=batch_size)
+
+
+import time
+import random
+import numpy as np
+import tensorflow as tf
+from tensorflow.keras import backend as K
+import tensorflow.keras.callbacks as callbacks
+import tensorflow.keras.optimizers as optimizers
+from advanced import HistoryCheckpoint, TensorBoardBatch
+from tensorflow.keras.models import Model
+# from tensorflow.python.framework.ops import disable_eager_execution
+# disable_eager_execution()
+from data_generator import read_img_dataset
+from un_data_generator import un_read_img_dataset
+import prepare_data as psd
+from sklearn.model_selection import train_test_split
+import img_utils
+
+model = None
+# from tensorflow.keras import mixed_precision
+# policy = mixed_precision.Policy('float32')
+# mixed_precision.set_global_policy(policy)
+
+def print_status_bar(iteration, total, loss, metrics=None):
+    metrics = " - ".join(["{}: {:.4f}".format(m.name, m.result()) for m in loss + (metrics or [])])
+    end = "" if iteration < total else "\n"
+    print("\r===> {}/{} - ".format(iteration, total) + metrics, end=end)
+
+def train3(height, width, nb_epochs=10, batch_size=32, save_arch=False, load_weights=True):
+    global model
+
+    # stitch_model = model_stitching.NonLocalResNetStitching()
+    stitch_model = net()  # model_stitching.DeepDenoiseStitch()
+    stitch_model.create_model(height=height, width=width, load_weights=load_weights)
+
+    if save_arch:
+        plot_model(stitch_model.model, to_file=f"architectures/model_img/{model_name}.png", show_shapes=True,
+                   show_layer_names=True)
+
+    model = stitch_model.model
+    loss_network = VGGLossNetwork()
+
+    callback_list = []
+
+    # Parameters
+    params = {'dim': (width, height),
+                'batch_size': batch_size,
+                'n_channels': 15,
+                'shuffle': True}
+    history_fn=f"{model_name}History.txt"
+
+    # Get Datasets
+    h_indexes = img_utils.get_dataset_indexes(model_name)
+    config_data = psd.read_json_file(cfg.config_img_output)
+    if h_indexes:
+        train_indexes = np.array(h_indexes["train_indexes"])
+        test_indexes = np.array(h_indexes["test_indexes"])
+        samples_per_epoch = h_indexes["samples_per_epoch"]
+        val_count = h_indexes["val_count"]
+    else:
+        data_indexes = np.arange(config_data["total_samples"])
+        train_indexes, test_indexes = train_test_split(data_indexes, test_size=0.10)
+        samples_per_epoch = len(train_indexes)
+        val_count = len(test_indexes)
+        img_utils.save_dataset_indexes(model_name, train_indexes.tolist(), test_indexes.tolist(), samples_per_epoch, val_count)
+
+    train_dataset = read_img_dataset(train_indexes, config_data, callee="un_training_generator", **params)
+    val_dataset = read_img_dataset(test_indexes, config_data, callee="un_validation_generator", **params)
+
+    callback_list.append(callbacks.ModelCheckpoint(stitch_model.weight_path, monitor='loss', save_best_only=True,
+                                            mode='min', save_weights_only=True, verbose=2))
+
+    # TODO: Guard this with an if condition to use this checkpoint only when dealing with supervised training
+    callback_list.append(callbacks.ModelCheckpoint(stitch_model.weight_path, monitor='val_SSIMLoss', save_best_only=True,
+                                                mode='max', save_weights_only=True, verbose=2))
+
+    callback_list.append(HistoryCheckpoint(f'{cfg.log_dir}/{history_fn}'))
+    log_dir = f'{cfg.log_dir}/{stitch_model.model_name}_logs/'
+    tensorboard = TensorBoardBatch(log_dir, batch_size=batch_size)
+    callback_list.append(tensorboard)
+    all_callbacks = callbacks.CallbackList(callback_list, add_history=True, model=model)
+
+    optimizer = tf.keras.optimizers.Adam(learning_rate=1e-3)
+    # optimizer = mixed_precision.LossScaleOptimizer(optimizer)
+
+    total_loss_avg = tf.keras.metrics.Mean(name='Total Loss')
+    style_loss_avg = tf.keras.metrics.Mean(name='Style Loss')
+    content_loss_avg = tf.keras.metrics.Mean(name='Content Loss')
+    gradient_loss_avg = tf.keras.metrics.Mean(name='Gradient Loss')
+    simple_loss_avg = tf.keras.metrics.Mean(name='Simple Loss (MSE)')
+
+    metrics = [PNSRMetric(name="val_PSNRLoss"), SSIMMetric(name="val_SSIMLoss")]
+
+    simple_loss_fn = tf.keras.losses.mean_squared_error
+
+    logs = {}
+    all_callbacks.on_train_begin(logs=logs)
+    epochs = nb_epochs
+
+    @tf.function
+    def test_step(batch, return_dict=True):
+        x_batch, y_batch = batch
+        prediction = model(x_batch, training=False)
+        y_pred_clip = (prediction + 1.0) / 2.0
+
+        for metric in metrics:
+            metric(y_batch, y_pred_clip)
+
+        if return_dict:
+            logs = {
+                "loss": total_loss_avg.result(),
+                "total_loss": total_loss_avg.result(),
+                "content_loss": content_loss_avg.result(),
+                "style_loss": style_loss_avg.result(),
+                "grad_loss": gradient_loss_avg.result(),
+                "simple_loss": simple_loss_avg.result(),
+            }
+            for metric in metrics:
+                logs[metric.name] = metric.result()
+            
+            return logs
+        
+        # return img_utils.deprocess(prediction)
+
+    @tf.function
+    def train_step(batch, return_dict=True):
+        # model = Model
+        x_batch, y_batch = batch
+        with tf.GradientTape() as tape:
+            y_pred = model(x_batch, training=True)
+            y_pred_clip = (y_pred + 1.0) / 2.0
+            output_batch = 255*y_pred_clip # float deprocess
+            target_batch = 255*y_batch # float deprocess
+
+            # Feed target and output batch through loss_network
+            target_batch_feature_maps = loss_network(target_batch)
+            output_batch_feature_maps = loss_network(output_batch)
+            num_style_layers = len(target_batch_feature_maps)        
+
+            c_loss = img_utils.content_loss(target_batch_feature_maps[img_utils.hparams['content_layer_index']],
+                                  output_batch_feature_maps[img_utils.hparams['content_layer_index']])     
+            c_loss *= img_utils.hparams['content_weight']
+
+            # # Get output gram_matrix
+            # target_gram_matrices = [img_utils.gram_matrix(x) for x in target_batch_feature_maps]
+            # output_gram_matrices = [img_utils.gram_matrix(x) for x in output_batch_feature_maps]
+            # s_loss = img_utils.style_loss(target_gram_matrices, 
+            #                     output_gram_matrices)
+            # s_loss *= img_utils.hparams['style_weight'] / num_style_layers
+            s_loss = 0
+
+            grad_loss = 0 # img_utils.hparams['gradient_weight'] * img_utils.gradient_loss(y_batch, y_pred_clip)
+
+            mse_loss = img_utils.hparams['simple_weight'] * tf.reduce_mean(simple_loss_fn(y_batch, y_pred_clip))
+            tv_loss = 0 # img_utils.hparams['tv_weight'] * img_utils.total_variation_loss(output_batch)
+
+            main_loss = c_loss + s_loss + mse_loss + grad_loss + tv_loss
+            total_loss = tf.add_n([main_loss] + model.losses)
+        #     scaled_loss = optimizer.get_scaled_loss(total_loss)
+
+        # scaled_gradients = tape.gradient(scaled_loss, model.trainable_variables)
+        # gradients = optimizer.get_unscaled_gradients(scaled_gradients)
+        gradients = tape.gradient(total_loss, model.trainable_variables)
+        optimizer.apply_gradients(zip(gradients, model.trainable_variables))
+
+        total_loss_avg(total_loss)
+        content_loss_avg(c_loss)
+        style_loss_avg(s_loss)
+        simple_loss_avg(mse_loss)
+        gradient_loss_avg(grad_loss)
+
+        # for metric in metrics:
+        #     metric(y_batch, y_pred_clip)
+
+        if return_dict:
+            logs = {
+                "loss": total_loss_avg.result(),
+                "total_loss": total_loss_avg.result(),
+                "content_loss": content_loss_avg.result(),
+                "style_loss": style_loss_avg.result(),
+                "grad_loss": gradient_loss_avg.result(),
+                "simple_loss": simple_loss_avg.result(),
+            }
+            return logs
+    
+    steps_per_epoch = (samples_per_epoch // batch_size)
+    validation_steps = (val_count // batch_size)
+    total_time = time.time()
+
+    all_callbacks.on_train_begin()
+    for epoch in range(1, epochs + 1):
+        all_callbacks.on_epoch_begin(epoch, logs=logs)
+        print("Epoch {} / {}".format(epoch, epochs))
+        start_time = time.time()
+
+        # Iterate over the batches of the dataset.
+        for step, (x_batch_train, y_batch_train) in enumerate(train_dataset):
+            # print(y_batch_train.shape)
+
+            all_callbacks.on_batch_begin(step, logs=logs)
+            all_callbacks.on_train_batch_begin(step, logs=logs)
+
+            # logs = model.train_on_batch(x={"main_input": x_batch_train, "x_true_input": y_batch_train}, 
+            # y={"st_conv_final": y_batch_train}, return_dict=True)
+            logs = train_step(batch=(x_batch_train, y_batch_train))
+
+            all_callbacks.on_train_batch_end(step, logs=logs)
+            all_callbacks.on_batch_end(step, logs=logs)
+
+            print_status_bar(step, steps_per_epoch, [total_loss_avg, style_loss_avg, content_loss_avg, gradient_loss_avg, simple_loss_avg])
+
+        # Run a validation loop at the end of each epoch.
+        for step, (x_batch_val, y_batch_val) in enumerate(val_dataset):
+            all_callbacks.on_batch_begin(step, logs=logs)
+            all_callbacks.on_test_batch_begin(step, logs=logs)
+
+            # logs = model.test_on_batch(x=[x_batch_val, y_batch_val], y=y_batch_val, return_dict=True)
+            # model = Model
+            # logs = model.test_on_batch(x={"main_input": x_batch_val, "x_true_input": y_batch_val}, 
+            # y={"st_conv_final": y_batch_val}, return_dict=True)
+            logs = test_step(batch=(x_batch_val, y_batch_val))
+
+            all_callbacks.on_test_batch_end(step, logs=logs)
+            all_callbacks.on_batch_end(step, logs=logs)
+
+            print_status_bar(step, validation_steps, [total_loss_avg, style_loss_avg, content_loss_avg, gradient_loss_avg, simple_loss_avg], metrics)
+
+     
+        # print("Validation acc: %.4f" % (float(val_acc),))
+        all_callbacks.on_epoch_end(epoch, logs=logs)
+
+        print("\nTime taken per epoch: %.2fs" % (time.time() - start_time))
+        for metric in [total_loss_avg, content_loss_avg, style_loss_avg, gradient_loss_avg, simple_loss_avg] + metrics:
+            metric.reset_states()
+
+    print("\nTotal Time Training: %.2fs" % (time.time() - total_time))
+    all_callbacks.on_train_end(logs=logs)
+    img_utils.delete_dataset_indexes(model_name)
+
+
+def un_train(height, width, nb_epochs=10, batch_size=32, save_arch=False, load_weights=True):
+    """Unsupervised Training"""
+    global model
+
+    # stitch_model = model_stitching.NonLocalResNetStitching()
+    stitch_model = net()  # model_stitching.DeepDenoiseStitch()
+    stitch_model.create_model(height=height, width=width, load_weights=load_weights)
+
+    if save_arch:
+        plot_model(stitch_model.model, to_file=f"architectures/model_img/{model_name}.png", show_shapes=True,
+                   show_layer_names=True)
+
+    model = stitch_model.model
+    loss_network = VGGLossNetwork()
+
+    callback_list = []
+
+    # Parameters
+    params = {'dim': (width, height),
+                'batch_size': 1, # Read one sample at time
+                'buffer_size': batch_size,
+                'n_channels': 15,
+                'shuffle': True}
+    history_fn=f"{model_name}History.txt"
+
+    # Get Datasets
+    h_indexes = img_utils.get_dataset_indexes(model_name)
+    config_data = psd.read_json_file(cfg.config_img_output)
+    if h_indexes:
+        train_indexes = np.array(h_indexes["train_indexes"])
+        samples_per_epoch = h_indexes["samples_per_epoch"]
+    else:
+        train_indexes = np.random.permutation(config_data["total_samples"])
+        samples_per_epoch = len(train_indexes)
+        img_utils.save_dataset_indexes(model_name, train_indexes.tolist(), "test_indexes.tolist()", samples_per_epoch, "val_count")
+
+    train_dataset = un_read_img_dataset(train_indexes, config_data, callee="un_training_generator", **params)
+
+    callback_list.append(callbacks.ModelCheckpoint(stitch_model.weight_path, monitor='loss', save_best_only=True,
+                                            mode='min', save_weights_only=True, verbose=2))
+
+    callback_list.append(HistoryCheckpoint(f'{cfg.log_dir}/{history_fn}'))
+    log_dir = f'{cfg.log_dir}/{stitch_model.model_name}_logs/'
+    tensorboard = TensorBoardBatch(log_dir, batch_size=batch_size)
+    callback_list.append(tensorboard)
+    all_callbacks = callbacks.CallbackList(callback_list, add_history=True, model=model)
+
+    optimizer = tf.keras.optimizers.Adam(learning_rate=1e-3)
+    # optimizer = mixed_precision.LossScaleOptimizer(optimizer)
+
+    total_loss_avg = tf.keras.metrics.Mean(name='Avg. Total Loss')
+    style_loss_avg = tf.keras.metrics.Mean(name='Avg. Style Loss')
+    content_loss_avg = tf.keras.metrics.Mean(name='Avg. Content Loss')
+
+    logs = {}
+    all_callbacks.on_train_begin(logs=logs)
+    epochs = nb_epochs
+
+    def compute_loss(target_batch, output_batch):
+        
+        # Feed target and output batch through loss_network
+        mask = tf.where(target_batch != 0., 1., 0.)
+        target_batch_feature_maps = loss_network(target_batch)
+
+        output_batch_feature_maps = loss_network(output_batch*mask)
+        # num_style_layers = len(target_batch_feature_maps)
+
+        c_loss = img_utils.content_loss(target_batch_feature_maps[img_utils.hparams['content_layer_index']],
+                                output_batch_feature_maps[img_utils.hparams['content_layer_index']])     
+        c_loss *= (img_utils.hparams['content_weight'] / batch_size)
+
+        # # Get output gram_matrix
+        s_loss = img_utils.style_loss(target_batch_feature_maps,  output_batch_feature_maps)
+        s_loss *= (img_utils.hparams['style_weight'] / batch_size)
+        # s_loss = 0
+        
+        tv_loss = img_utils.total_variation_loss(output_batch)
+        tv_loss *= (img_utils.hparams['tv_weight'] / batch_size)
+
+        main_loss = c_loss + s_loss + tv_loss #
+        total_loss = tf.add_n([main_loss] + model.losses)
+
+        return total_loss, c_loss, s_loss
+
+    def train_step(sample_data, batch_id, batch_size, loss_dict, return_dict=True):
+        # model = Model
+        x_batch, y_batch = sample_data
+        with tf.GradientTape() as tape:
+            y_pred = model(x_batch, training=True)
+            y_pred_clip = (y_pred + 1.0) / 2.0
+            output_batch = 255*y_pred_clip # float deprocess
+            target_batch = 255*y_batch # float deprocess
+            # output_batch_feature_maps = loss_network(output_batch)
+            # loss_dict = {"total_loss": 0, "st_loss": 0, "ct_loss": 0}
+            # total_loss = loss_dict["total_loss"]
+            # c_loss = loss_dict["st_loss"]
+            # s_loss = loss_dict["ct_loss"]
+            
+            nb_cameras = tf.cast(tf.cast(target_batch.shape[-1], tf.float32) / 3.0, tf.uint8)
+            r = list(range(nb_cameras))
+            random.shuffle(r)
+            for i in r:
+                tl, cl, sl = compute_loss(target_batch=target_batch[:, :, :, i*3:(i+1)*3], output_batch=output_batch)
+                loss_dict["total_loss"] += tl
+                loss_dict["st_loss"] += sl
+                loss_dict["ct_loss"] += cl
+            
+        # scaled_gradients = tape.gradient(scaled_loss, model.trainable_variables)
+        # gradients = optimizer.get_unscaled_gradients(scaled_gradients)
+        if batch_id >= batch_size-1:
+            gradients = tape.gradient(loss_dict["total_loss"], model.trainable_variables)
+            optimizer.apply_gradients(zip(gradients, model.trainable_variables))
+
+        total_loss_avg(loss_dict["total_loss"])
+        content_loss_avg(loss_dict["ct_loss"])
+        style_loss_avg(loss_dict["st_loss"])
+        
+        if return_dict:
+            logs = {
+                "loss": total_loss_avg.result(),
+                "total_loss": total_loss_avg.result(),
+                "content_loss": content_loss_avg.result(),
+                "style_loss": style_loss_avg.result()
+            }
+            return logs
+    
+    steps_per_epoch = (samples_per_epoch // batch_size)
+    total_time = time.time()
+
+    all_callbacks.on_train_begin()
+    for epoch in range(1, epochs + 1):
+        all_callbacks.on_epoch_begin(epoch, logs=logs)
+        print("Epoch {} / {}".format(epoch, epochs))
+        start_time = time.time()
+
+        # Iterate over the batches of the dataset.
+        batchid =  0
+        batch_step =  0
+        loss_dict = {"total_loss": 0, "st_loss": 0, "ct_loss": 0}
+        for (x_batch_train, y_batch_train) in train_dataset:
+            # print(y_batch_train.shape)
+
+            if batchid == 0:
+                all_callbacks.on_batch_begin(batch_step, logs=logs)
+                all_callbacks.on_train_batch_begin(batch_step, logs=logs)
+
+            # logs = model.train_on_batch(x={"main_input": x_batch_train, "x_true_input": y_batch_train}, 
+            # y={"st_conv_final": y_batch_train}, return_dict=True)
+            logs = train_step((x_batch_train, y_batch_train), batch_id=batchid, batch_size=batch_size, loss_dict=loss_dict)
+            batchid = batchid + 1
+
+            if batchid >= batch_size:
+                all_callbacks.on_train_batch_end(batch_step, logs=logs)
+                all_callbacks.on_batch_end(batch_step, logs=logs)
+                print_status_bar(batch_step, steps_per_epoch, [total_loss_avg, style_loss_avg, content_loss_avg])
+                batchid = 0
+                loss_dict = {"total_loss": 0, "st_loss": 0, "ct_loss": 0}
+                batch_step += 1
+
+     
+        all_callbacks.on_epoch_end(epoch, logs=logs)
+
+        print("\nTime taken per epoch: %.2fs" % (time.time() - start_time))
+        for metric in [total_loss_avg, content_loss_avg, style_loss_avg]:
+            metric.reset_states()
+
+    print("\nTotal Time Training: %.2fs" % (time.time() - total_time))
+    all_callbacks.on_train_end(logs=logs)
+    img_utils.delete_dataset_indexes(model_name)
+
 
 
 def save_model_plots():
@@ -64,6 +482,11 @@ if __name__ == "__main__":
     """
     Plot the models
     """
-    train(height=cfg.patch_size, width=cfg.patch_size, save_arch=False, nb_epochs=args.nb_epochs,
-          batch_size=args.batch_size, load_weights=args.load_weights)
+    if args.supervised:
+        train3(height=cfg.patch_size, width=cfg.patch_size, save_arch=args.save_model_img, nb_epochs=args.nb_epochs,
+            batch_size=args.batch_size, load_weights=args.load_weights)
+    else:
+        with tf.device('/GPU:0'):
+            un_train(height=cfg.un_patch_size, width=cfg.un_patch_size, save_arch=args.save_model_img, nb_epochs=args.nb_epochs,
+            batch_size=args.batch_size, load_weights=args.load_weights)
     # save_model_plots()
