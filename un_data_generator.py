@@ -104,7 +104,7 @@ class DataGenerator(keras.utils.Sequence):
             # Store sample
             dataset_id, patchx_id, patchy_id, img_idx, total_imgs, nb_cameras = self.__get_dataset_patch(ID)
             ts = psd.TrainingSample(datasetID=dataset_id, imgID=img_idx, patchX=patchx_id,
-                                    patchY=patchy_id, image_folder=cfg.image_folder, nb_cameras=nb_cameras)
+                                    patchY=patchy_id, image_folder=cfg.un_image_folder, nb_cameras=nb_cameras)
 
             if os.path.exists(ts.get_sample_path()):
                 print(f"==> index: {ID}, {ts.get_sample_path()}, check: {os.path.exists(ts.get_sample_path())}")
@@ -130,29 +130,29 @@ class DataGenerator(keras.utils.Sequence):
 
         return X
 
-    def test_get_scene_patch(self, index):
-        return self.__get_dataset_patch(index)
+    # def test_get_scene_patch(self, index):
+    #     return self.__get_dataset_patch(index)
 
-    def test_data_generator(self, index_list):
-        # Store sample
-        paths = []
-        for ID in index_list:
-            dataset_id, patchx_id, patchy_id, img_idx, total_imgs, nb_cameras = self.__get_dataset_patch(ID)
-            ts = psd.TrainingSample(datasetID=dataset_id, imgID=img_idx, patchX=patchx_id,
-                                patchY=patchy_id, image_folder=cfg.image_folder, nb_cameras=nb_cameras)
+    # def test_data_generator(self, index_list):
+    #     # Store sample
+    #     paths = []
+    #     for ID in index_list:
+    #         dataset_id, patchx_id, patchy_id, img_idx, total_imgs, nb_cameras = self.__get_dataset_patch(ID)
+    #         ts = psd.TrainingSample(datasetID=dataset_id, imgID=img_idx, patchX=patchx_id,
+    #                             patchY=patchy_id, image_folder=cfg.un_image_folder, nb_cameras=nb_cameras)
 
-            paths.append(ts.get_sample_path())
-            if not os.path.exists(ts.get_sample_path()):
-                print(f"==> index: {ID}, {ts.get_sample_path()}, check: {os.path.exists(ts.get_sample_path())}")
+    #         paths.append(ts.get_sample_path())
+    #         if not os.path.exists(ts.get_sample_path()):
+    #             print(f"==> index: {ID}, {ts.get_sample_path()}, check: {os.path.exists(ts.get_sample_path())}")
 
-        print("==> Checking for duplicate")
-        if len(paths) != len(set(paths)):
-            print("There are duplicates.")
-        else:
-            print("All file names are unique")
+    #     print("==> Checking for duplicate")
+    #     if len(paths) != len(set(paths)):
+    #         print("There are duplicates.")
+    #     else:
+    #         print("All file names are unique")
 
-        print("test_data_generator Done!")
-        return
+    #     print("test_data_generator Done!")
+    #     return
 
     def test_path_generator(self, index_list):
         return self.__img_path_generation(index_list)
@@ -186,7 +186,7 @@ def un_read_img_dataset(list_ids, config_data, callee, batch_size=32, dim=(256, 
 
     dataset = tf.data.Dataset.from_tensor_slices(list_paths)
 
-    dataset = dataset.map(lambda item1, item2=dim, item3=n_channels, item4=str(cfg.image_folder): tf.numpy_function(
+    dataset = dataset.map(lambda item1, item2=dim, item3=n_channels, item4=str(cfg.un_image_folder): tf.numpy_function(
         un_load_data_sample, [item1, item2, item3, item4], [tf.float32, tf.float32]), num_parallel_calls=tf.data.AUTOTUNE)  #
 
     return dataset.repeat(1).batch(batch_size=batch_size).prefetch(buffer_size)
@@ -194,12 +194,12 @@ def un_read_img_dataset(list_ids, config_data, callee, batch_size=32, dim=(256, 
 
 if __name__ == "__main__":
 
-    config_data = psd.read_json_file(cfg.config_img_output)
+    config_data = psd.read_json_file(cfg.un_config_img_output)
 
-    d1 = DataGenerator([*range(config_data["total_samples"])], config_data, dim=(cfg.patch_size, cfg.patch_size))
+    d1 = DataGenerator([*range(config_data["total_samples"])], config_data, dim=(cfg.un_patch_size, cfg.un_patch_size))
     
     list_paths = d1.generate_img_path()
     print("------------------------------------------")
     print(list_paths[0:2])
-    X, Y = un_load_data_sample(list_paths[2], dim=None, n_channels=None, training_folder=str(cfg.image_folder))
+    X, Y = un_load_data_sample(list_paths[2], dim=None, n_channels=None, training_folder=str(cfg.un_image_folder))
     print(X.shape, " - ", Y.shape)

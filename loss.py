@@ -135,9 +135,7 @@ class SSIMMetric(tf.keras.metrics.Metric):
         self.max_val = max_val
 
     def update_state(self, y_true, y_pred, sample_weight=None):
-        y_true_gray = tf.image.rgb_to_grayscale(y_true)
-        y_pred_gray = tf.image.rgb_to_grayscale(y_pred)
-        ssim_value = tf.image.ssim(y_true_gray, y_pred_gray, max_val=self.max_val)
+        ssim_value = tf.image.ssim(y_true, y_pred, max_val=self.max_val)
         self.ssim.assign_add(tf.reduce_sum(ssim_value))
         # self.count.assign_add(tf.cast(tf.shape(y_true)[0], tf.float32))
         self.count.assign_add(tf.cast(tf.size(ssim_value), tf.float32))

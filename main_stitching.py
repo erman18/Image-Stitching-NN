@@ -70,6 +70,21 @@ def calculate_ssim(img1, img2):
     else:
         raise ValueError('Wrong input image dimensions.')
 
+def save_blending_result(img_merge, outdir, file_prefix, nb_layers=None):
+    
+    img_shape = img_merge.shape
+    if len(img_shape) < 4:
+        cfg.PRINT_ERROR("Invalid Image Shape")
+        exit(1)
+
+    if not nb_layers:
+        nb_layers = int(img_shape[3]//3)
+
+    # Save SandFall layers
+    for i in range(nb_layers):
+        filename = os.path.join(outdir, file_prefix + str(i) + ".jpg")
+        img = img_merge[0, :,:, i*3:(i+1)*3]
+        cv2.imwrite(filename, cv2.cvtColor((img*255).astype(np.uint8), cv2.COLOR_RGB2BGR))
 
 def stitch(files, model_type, outdir, scale_factor, compare_result=True):
 
@@ -78,6 +93,7 @@ def stitch(files, model_type, outdir, scale_factor, compare_result=True):
     os.makedirs(m_outdir, exist_ok=True)
     suffix = time.strftime("_%Y%m%d-%H%M%S")
     img_merge = panow.pano_stitch_single_camera(files, multi_band_blend=-1, return_img=True)
+    save_blending_result(img_merge, outdir, "merge_layer", abs(cfg.sandfall_layer))
     img_merge = panow.pano_stitch_single_camera(files, multi_band_blend=-5, return_img=True)
     # panow.print_config()
     if img_merge is None:
@@ -85,10 +101,11 @@ def stitch(files, model_type, outdir, scale_factor, compare_result=True):
         sys.exit()
 
     # Save SandFall layers
-    for i in range(abs(cfg.sandfall_layer)):
-        filename = os.path.join(outdir, "sandfall_layer" + str(i) + ".jpg")
-        img = img_merge[0, :,:, i*3:(i+1)*3]
-        cv2.imwrite(filename, cv2.cvtColor((img*255).astype(np.uint8), cv2.COLOR_RGB2BGR))
+    save_blending_result(img_merge, outdir, "sandfall_layer", abs(cfg.sandfall_layer))
+    # for i in range(abs(cfg.sandfall_layer)):
+    #     filename = os.path.join(outdir, "sandfall_layer" + str(i) + ".jpg")
+    #     img = img_merge[0, :,:, i*3:(i+1)*3]
+    #     cv2.imwrite(filename, cv2.cvtColor((img*255).astype(np.uint8), cv2.COLOR_RGB2BGR))
 
     img_mbb = None
     if compare_result:

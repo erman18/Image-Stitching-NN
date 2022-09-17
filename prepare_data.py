@@ -63,12 +63,6 @@ def read_json_arr(filename):
 def remove_file(filename):
     os.remove(filename) if os.path.exists(filename) else None
 
-# dataset_folder = cfg.dataset_folder + "/images"
-# target_folder = cfg.dataset_folder + "/target"
-# training_folder = cfg.dataset_folder + "/train"
-# config_file = cfg.dataset_folder + "/config_file.json"
-
-
 class TrainingSample:
     def __init__(self, datasetID, imgID, patchX, patchY, image_folder, nb_cameras=None):
         # self.sample_id = sampleID
@@ -126,7 +120,7 @@ class TrainingSample:
 
 class Dataset:
     def __init__(self, datasetID, total_img, nb_cameras, nb_img_generate, img_pattern,
-                 image_folder, imgfs="MCMI", input_img_dir=None, scale_factor=1.0, data_settings=None):
+                 image_folder, imgfs="MCMI", input_img_dir=None, scale_factor=1.0, config_output_file=None, training_config_dict=None):
         """
         Class to Generate the dataset from Pano Stitcher
         :param datasetID:
@@ -147,7 +141,7 @@ class Dataset:
                         "MCSI: Multi-Camera Multi-Image ('camID' in the file pattern"
                         "LIST: list of files image to stitch and provide the list in the --files param"
                         "IDIR: Image Directory of files with *.jpg, *.jpeg, *.png, and *.bmp will be retrieve in the folder indicate by --imgdir"
-        :param data_settings: Default: None. Dictionary of the data setting for this dataset
+        :param training_config_dict: Default: None. Dictionary of the data setting for this dataset
         """
         self.dataset_id = datasetID
         self.total_img = total_img
@@ -157,13 +151,15 @@ class Dataset:
         self.nb_cameras = nb_cameras
         self.scale_factor = scale_factor
         self.nb_img_generate = nb_img_generate
+        self.image_folder = f"{image_folder}"
+        self.config_output_file = f"{config_output_file}"
         self.dataset_path = f"{image_folder}/{datasetID}"
         self.target_img_path = f"{self.dataset_path}/target"
         self.sample_folder = f"{self.dataset_path}/X"
         self.target_path = f"{self.dataset_path}/y"
         # self.__is_supervised = True # By default the data are generated for supervised training
 
-        self.dataset_settings = data_settings
+        self.dataset_settings = training_config_dict
         if "total_dataset" not in self.dataset_settings:
             self.dataset_settings.clear()
             self.dataset_settings["total_dataset"] = 0
@@ -259,7 +255,8 @@ class Dataset:
             else:
                 ValueError("Please indicate the dataset file structure for your images") 
             self.nb_cameras = len(files)
-            self.dataset_settings["nb_cameras"] = self.nb_cameras
+            # self.dataset_settings["nb_cameras"] = self.nb_cameras
+            self.set_dataset_settings("nb_cameras", self.nb_cameras)
 
             try:
                 panow.init_pano_stitcher(files, multi_band_blend=cfg.sandfall_layer)
@@ -283,7 +280,6 @@ class Dataset:
     def generate_un_dataset(self):
         """Generate Dataset for Unsupervised Training"""
 
-        # self.__is_supervised = False
         panow = pw.PanoWrapper(scale_factor_x=self.scale_factor, scale_factor_y=self.scale_factor)
 
         if self.imgfs == "MCMI":
@@ -382,7 +378,7 @@ class Dataset:
             target_patch = target_patches[patchIdx, patchIdy, 0, :, :]
 
             train_sample_obj = TrainingSample(datasetID=self.dataset_id, imgID=img_id, patchX=patchIdx,
-                                              patchY=patchIdy, image_folder=cfg.image_folder, nb_cameras=self.nb_cameras)
+                                              patchY=patchIdy, image_folder=self.image_folder, nb_cameras=self.nb_cameras)
 
             train_sample_obj.save_sample(img_patch)
             train_sample_obj.save_target(target_patch)
@@ -396,7 +392,7 @@ class Dataset:
                         ex.submit(__save_patch, patchIdx, patchIdy, pbar)
 
         # Update config file each iteration
-        write_json_file(cfg.config_img_output, data=self.dataset_settings)
+        write_json_file(self.config_output_file, data=self.dataset_settings)
         return
 
 
@@ -404,9 +400,14 @@ def prepare_data_live(args):
     """Prepare data set for image stitching"""
 
     print("Argument: ", args, " - is supervised? ", args.supervised)
+    image_folder = cfg.image_folder if args.supervised else cfg.un_image_folder
+    config_output_file = cfg.config_img_output if args.supervised else cfg.un_config_img_output
+    
+    # Read the input of the new data file settings
     data_file_settings = read_json_file(cfg.config_img_input)
 
-    config_output_file = read_json_file(cfg.config_img_output)
+    # Read the output config file of all the training data already generated.
+    training_config_dict = read_json_file(config_output_file)
 
     print(data_file_settings)
     global_scale_factor = data_file_settings.get("global_scale_factor", 1.0)
@@ -422,12 +423,11 @@ def prepare_data_live(args):
         input_img_dir = dataset_dc.get("input_img_dir", None)
         imgfs = dataset_dc.get("IMGFS", "MCMI")
         scale_factor = dataset_dc.get("scale_factor", 1.0)
-        image_folder = cfg.image_folder
         # print("==>", img_pattern)
         # scale_factor = scale_factor*2 if args.supervised else scale_factor*2
         scale_factor = scale_factor*global_scale_factor
         ds = Dataset(datasetID, total_img, nb_cameras, nb_img_generate, img_pattern, image_folder, imgfs,
-                     input_img_dir, scale_factor, config_output_file)
+                     input_img_dir, scale_factor, config_output_file, training_config_dict)
 
         if args.supervised:
             ds.generate_dataset()
@@ -443,80 +443,3 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     prepare_data_live(args)
-
-    # import libpyopenpano as pano
-    # # help(pano)
-    # # Test Stitching
-    # pano.print_config()
-    # pano.init_config(cfg.pano_config_file)
-    # pano.print_config()
-    #
-    # mdata = [
-    #     {
-    #         "img_pattern": "/media/sf_Data/data_stitching/Terrace/Input/{camID:05d}/{imgID:05d}.jpg",
-    #         "out_dir": "/media/sf_Data/data_stitching/Terrace/Out2",
-    #         "nb_cameras": 14,
-    #         "calib_img_id": 0,
-    #         "total_img": 430,
-    #     },
-    #     {
-    #         "img_pattern": "/media/sf_Data/data_stitching/Terrace/Input/{camID:05d}/{imgID:05d}.jpg",
-    #         "out_dir": "/media/sf_Data/data_stitching/Terrace/Out2",
-    #         "nb_cameras": 14,
-    #         "calib_img_id": 0,
-    #         "total_img": 430,
-    #     }
-    # ]
-    #
-    # id = 0
-    # # img_dir = "/media/sf_Data/data_stitching/Terrace/Input/{:05d}/{:05d}.jpg"
-    # out_dir = mdata[id]["out_dir"]
-    # nb_camera = mdata[id]["nb_cameras"]
-    # total_img = mdata[id]["total_img"]
-    # os.makedirs(out_dir, exist_ok=True)
-    # output_result = None
-    #
-    # nb_stitched_img = 0
-    # stitcher = None
-    # for img_id in range(total_img):
-    #     print(f"-----------------------------{img_id}------------------------")
-    #     file_list = [mdata[id]["img_pattern"].format(camID=i, imgID=img_id) for i in range(mdata[id]["nb_cameras"])]
-    #     output_result = f"{out_dir}/{img_id:05d}.jpg"
-    #
-    #     print(file_list)
-    #     print(output_result)
-    #
-    #     stitcher = None
-    #     try:
-    #         stitcher = pano.Stitcher(file_list)
-    #         mat = stitcher.build()
-    #         pano.write_img(output_result, mat)
-    #         break
-    #     except:
-    #         print(f"Error: Cannot stitch image [{img_id}] - [{output_result}]")
-    #
-    # print(f"First image stitched: {stitcher} --> Location: {output_result}")
-    # multi_band_blend = 0  # 0 is for linear blending
-    # time.sleep(10)
-    # for img_id in range(total_img):
-    #     print(f"-----------------------------{img_id}------------------------")
-    #     file_list = [mdata[id]["img_pattern"].format(i, img_id) for i in range(mdata[id]["nb_cameras"])]
-    #     output_result = f"{out_dir}/{img_id:05d}.jpg"
-    #
-    #     try:
-    #         print(f"Try to build from new images {img_id}/{total_img}")
-    #         # print(file_list)
-    #         mat = stitcher.build_from_new_images(file_list, multi_band_blend)
-    #         print(f"Done building from new images {img_id}/{total_img}")
-    #         # time.sleep(10)
-    #         pano.write_img(output_result, mat)
-    #     except:
-    #         print(f"[build_from_new_images] Error: Cannot stitch image [{img_id}] - [{output_result}]")
-    #
-    # # pano.test_extrema(mat, 1)
-    # print("done stitching!", nb_stitched_img)
-    # # pano.print_config()
-    #
-    # # p = np.array(mat, copy=False)
-    # # plt.imshow(p)
-    # # plt.show()

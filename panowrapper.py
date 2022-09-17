@@ -115,7 +115,11 @@ class PanoWrapper:
         :param img_paths: The list of the image paths to stitched
         :param out_filename: The output filename
         :param calib_files: Camera calibration image file if exists
-        :param multi_band_blend: -1 for merge blending, 0 for linear blending, k>0 for multiband blending.
+        :param multi_band_blend: Indicate the blending method
+                                ** -1 for merge blending, 
+                                ** 0 for linear blending, 
+                                ** k>0 for multiband blending.
+                                ** k<-1 trigger the execution of the sandfall method with the number of layers being abs(k).
                                 Merge blending result cannot be saved directly a file.
         :param return_img: if True the resulting stitched image will be returned.
                             The result image would be a numpy array

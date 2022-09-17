@@ -72,7 +72,7 @@
   "9": {
    "IMGFS": "IDIR",
    "input_img_dir": "/mnt/data/enghonda/deepstitch-dataset/raw_data/UFCampus/UFWEST4",
-   "scale_factor": 1.0
+   "scale_factor": 1.5
  },
   "10": {
    "IMGFS": "IDIR",

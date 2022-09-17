@@ -31,7 +31,7 @@ DFS="MCMI"
 # SCALE_FACTOR=4
 
 # # Data Test 4
-# IMGDIR=/mnt/data/enghonda/deepstitch-dataset/raw_data/Terrace/Calibration
+# # IMGDIR=/mnt/data/enghonda/deepstitch-dataset/raw_data/Terrace/Calibration
 # OUTDIR=/mnt/data/enghonda/deepstitch-dataset/cvpr_result/Terrace3
 # CALIB_PATTERN=/mnt/data/enghonda/deepstitch-dataset/raw_data/Terrace/Input/{camID:05d}/{imgID:05d}.jpg
 # INPUT_PATTERN=/mnt/data/enghonda/deepstitch-dataset/raw_data/Terrace/Input/{camID:05d}/{imgID:05d}.jpg

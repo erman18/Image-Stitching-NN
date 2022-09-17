@@ -5,6 +5,7 @@ formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(messag
 logging_format = '%(asctime)s: %(levelname)s:%(message)s'
 dataset_folder = "/mnt/data/enghonda/deepstitch-dataset"
 image_folder = f"{dataset_folder}/training_data"
+un_image_folder = f"{dataset_folder}/un_training_data"
 
 project_dir = "."  # "/home/erman/projects/Image-Stitching-NN"
 project_setting_dir = project_dir + "/settings"
@@ -22,6 +23,7 @@ sandfall_layer = -5
 
 config_img_input = project_setting_dir + "/config_input_file.json"
 config_img_output = image_folder + "/config_output_file.json"
+un_config_img_output = un_image_folder + "/config_output_file.json"
 
 class Colors:
     """ ANSI color codes """
