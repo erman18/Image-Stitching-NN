@@ -45,7 +45,7 @@ def read_json_file(filename):
         with open(filename, 'r') as fp:
             mdata = dict(json.load(fp, object_pairs_hook=dict_raise_on_duplicates))
     except IOError:
-        print('File not found, will create a new one.')
+        print(f'File not found: {filename}.')
         mdata = dict()
 
     return mdata
@@ -56,7 +56,7 @@ def read_json_arr(filename):
         with open(filename, 'r') as fp:
             mdata = json.loads(fp.read())
     except IOError:
-        print('File not found, will create a new one.')
+        print(f'File not found: {filename}.')
 
     return mdata
 

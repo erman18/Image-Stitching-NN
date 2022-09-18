@@ -123,8 +123,8 @@ def train(height, width, nb_epochs=10, batch_size=32, save_arch=False, load_weig
         val_count = len(test_indexes)
         img_utils.save_dataset_indexes(model_name, train_indexes.tolist(), test_indexes.tolist(), samples_per_epoch, val_count)
 
-    train_dataset = read_img_dataset(train_indexes, config_data, callee="un_training_generator", **params)
-    val_dataset = read_img_dataset(test_indexes, config_data, callee="un_validation_generator", **params)
+    train_dataset = read_img_dataset(train_indexes, config_data, callee="training_generator", **params)
+    val_dataset = read_img_dataset(test_indexes, config_data, callee="validation_generator", **params)
 
     callback_list.append(callbacks.ModelCheckpoint(stitch_model.weight_path, monitor='loss', save_best_only=True,
                                             mode='min', save_weights_only=True, verbose=2))
@@ -194,24 +194,19 @@ def train(height, width, nb_epochs=10, batch_size=32, save_arch=False, load_weig
             # Feed target and output batch through loss_network
             target_batch_feature_maps = loss_network(target_batch)
             output_batch_feature_maps = loss_network(output_batch)
-            num_style_layers = len(target_batch_feature_maps)        
 
             c_loss = img_utils.content_loss(target_batch_feature_maps[img_utils.hparams['content_layer_index']],
                                   output_batch_feature_maps[img_utils.hparams['content_layer_index']])     
             c_loss *= img_utils.hparams['content_weight']
 
-            # # Get output gram_matrix
-            # target_gram_matrices = [img_utils.gram_matrix(x) for x in target_batch_feature_maps]
-            # output_gram_matrices = [img_utils.gram_matrix(x) for x in output_batch_feature_maps]
-            # s_loss = img_utils.style_loss(target_gram_matrices, 
-            #                     output_gram_matrices)
-            # s_loss *= img_utils.hparams['style_weight'] / num_style_layers
-            s_loss = 0
+            s_loss = img_utils.style_loss(target_batch_feature_maps, 
+                                output_batch_feature_maps)
+            s_loss *= img_utils.hparams['style_weight']
 
-            grad_loss = 0 # img_utils.hparams['gradient_weight'] * img_utils.gradient_loss(y_batch, y_pred_clip)
+            grad_loss = img_utils.hparams['gradient_weight'] * img_utils.gradient_loss(y_batch, y_pred_clip)
 
             mse_loss = img_utils.hparams['simple_weight'] * tf.reduce_mean(simple_loss_fn(y_batch, y_pred_clip))
-            tv_loss = 0 # img_utils.hparams['tv_weight'] * img_utils.total_variation_loss(output_batch)
+            tv_loss = img_utils.hparams['tv_weight'] * img_utils.total_variation_loss(output_batch)
 
             main_loss = c_loss + s_loss + mse_loss + grad_loss + tv_loss
             total_loss = tf.add_n([main_loss] + model.losses)

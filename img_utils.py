@@ -68,6 +68,15 @@ def gram_matrix(input_tensor):
     num_locations = tf.cast(input_shape[1]*input_shape[2], tf.float32) # int32 to float32
     return result/num_locations
 
+def style_loss(target_feature_maps, output_feature_maps):
+
+    # Get output gram_matrix
+    target_gram_matrices = [gram_matrix(x) for x in target_feature_maps]
+    output_gram_matrices = [gram_matrix(x) for x in output_feature_maps]
+    num_style_layers = len(target_feature_maps)
+    return tf.add_n([tf.reduce_mean((style_feat-out_feat)**2) 
+                        for style_feat, out_feat in zip(target_gram_matrices, output_gram_matrices)]) / num_style_layers
+
 def content_loss(content, output):
     return tf.reduce_mean((content-output)**2)
 
@@ -96,15 +105,6 @@ def gradient_loss(content, output):
     # ly_f = tf.nn.conv2d(ly, kernels_tf, strides=strides, padding='SAME')
 
     return tf.reduce_mean(lx + ly)
-
-def style_loss(target_feature_maps, output_feature_maps):
-
-    # Get output gram_matrix
-    target_gram_matrices = [gram_matrix(x) for x in target_feature_maps]
-    output_gram_matrices = [gram_matrix(x) for x in output_feature_maps]
-    num_style_layers = len(target_feature_maps)
-    return tf.add_n([tf.reduce_mean((style_feat-out_feat)**2) 
-                        for style_feat, out_feat in zip(target_gram_matrices, output_gram_matrices)]) / num_style_layers
 
 def save_hparams(model_name):
     json_hparams = json.dumps(hparams)
