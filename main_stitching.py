@@ -164,6 +164,13 @@ parser.add_argument("--dfs", nargs='?', type=str, default="MCMI", choices=["MCMI
                          "LIST: list of files image to stitch and provide the list in the --files param"
                          "IDIR: Image Directory of files with *.jpg, *.jpeg, *.png, and *.bmp will be retrieve in the folder indicate by --imgdir"
                          )
+parser.add_argument("--metric", type=str, default=None, 
+                    help="Pretrained Metric Weight to use: "
+                    "lpips: Learned Perceptual Image Patch Similarity"
+                    "is: Inception Score (IS)"
+                    "pnsr: Peak Signal-to-Noise Ratio"
+                    "ssim: SSIM - Structural Similarity Index Measure "
+                    )
 
 parser.add_argument("--model", type=str, default="ddis",
                     help="Use either image super resolution (is), "
@@ -227,9 +234,9 @@ if __name__ == "__main__":
     elif model_type == "rnis":  # Work
         model = model_stitching.ResNetStitch()
     elif model_type == "unrnis":  # Work
-        model = SSL_models.ResNetStitch()
+        model = SSL_models.ResNetStitch(metric=args.metric)
     elif model_type == "unddis":  # Work
-        model = SSL_models.DeepDenoiseStitch()
+        model = SSL_models.DeepDenoiseStitch(metric=args.metric)
     elif model_type == "distilled_rnis":  # Not Trained Yet
         # model = model_stitching.DistilledResNetStitch()
         print("The Distilled model has not been trained yet.")

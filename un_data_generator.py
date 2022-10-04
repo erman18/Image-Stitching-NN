@@ -6,7 +6,6 @@ import tensorflow as tf
 
 import prepare_data as psd
 import constant as cfg
-import cv2
 import gc
 
 
@@ -129,30 +128,6 @@ class DataGenerator(keras.utils.Sequence):
             X.append((dataset_id, patchx_id, patchy_id, img_id, total_imgs, nb_cameras))
 
         return X
-
-    # def test_get_scene_patch(self, index):
-    #     return self.__get_dataset_patch(index)
-
-    # def test_data_generator(self, index_list):
-    #     # Store sample
-    #     paths = []
-    #     for ID in index_list:
-    #         dataset_id, patchx_id, patchy_id, img_idx, total_imgs, nb_cameras = self.__get_dataset_patch(ID)
-    #         ts = psd.TrainingSample(datasetID=dataset_id, imgID=img_idx, patchX=patchx_id,
-    #                             patchY=patchy_id, image_folder=cfg.un_image_folder, nb_cameras=nb_cameras)
-
-    #         paths.append(ts.get_sample_path())
-    #         if not os.path.exists(ts.get_sample_path()):
-    #             print(f"==> index: {ID}, {ts.get_sample_path()}, check: {os.path.exists(ts.get_sample_path())}")
-
-    #     print("==> Checking for duplicate")
-    #     if len(paths) != len(set(paths)):
-    #         print("There are duplicates.")
-    #     else:
-    #         print("All file names are unique")
-
-    #     print("test_data_generator Done!")
-    #     return
 
     def test_path_generator(self, index_list):
         return self.__img_path_generation(index_list)
