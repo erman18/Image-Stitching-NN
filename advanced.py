@@ -68,11 +68,13 @@ class TensorBoardBatch(TensorBoard):
                  write_grads=False,
                  write_images=False,
                  embeddings_freq=0,
+                 profile_batch=(2000,2010),
                  embeddings_layer_names=None,
                  embeddings_metadata=None):
         super(TensorBoardBatch, self).__init__(log_dir,
                                                histogram_freq=histogram_freq,
                                             #    batch_size=batch_size,
+                                               profile_batch=profile_batch,
                                                write_graph=write_graph,
                                                write_grads=write_grads,
                                                write_images=write_images,
@@ -155,27 +157,27 @@ class TensorBoardBatch(TensorBoard):
 #     return out
 
 
-''' Theano Backend function '''
+# ''' Theano Backend function '''
 
 
-def depth_to_scale_th(input, scale, channels):
-    ''' Uses phase shift algorithm [1] to convert channels/depth for spacial resolution '''
-    try:
-        import theano.tensor as T
-    except ImportError:
-        print("Could not import Tensorflow for depth_to_scale operation. Please install Theano backend")
-        exit()
+# def depth_to_scale_th(input, scale, channels):
+#     ''' Uses phase shift algorithm [1] to convert channels/depth for spacial resolution '''
+#     try:
+#         import theano.tensor as T
+#     except ImportError:
+#         print("Could not import Tensorflow for depth_to_scale operation. Please install Theano backend")
+#         exit()
 
-    b, k, row, col = input.shape
-    output_shape = (b, channels, row * scale, col * scale)
+#     b, k, row, col = input.shape
+#     output_shape = (b, channels, row * scale, col * scale)
 
-    out = T.zeros(output_shape)
-    r = scale
+#     out = T.zeros(output_shape)
+#     r = scale
 
-    for y, x in itertools.product(range(scale), repeat=2):
-        out = T.inc_subtensor(out[:, :, y::r, x::r], input[:, r * y + x:: r * r, :, :])
+#     for y, x in itertools.product(range(scale), repeat=2):
+#         out = T.inc_subtensor(out[:, :, y::r, x::r], input[:, r * y + x:: r * r, :, :])
 
-    return out
+#     return out
 
 
 ''' Tensorflow Backend Function '''
