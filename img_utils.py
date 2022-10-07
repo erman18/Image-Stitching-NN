@@ -22,7 +22,6 @@ import json
 import prepare_data as psd
 import constant as cfg
 
-# from hparams import hparams
 hparams = {
            'content_weight': 1e-1, # 1e-5,
            'style_weight': 4e-9,
