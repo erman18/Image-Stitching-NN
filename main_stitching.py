@@ -114,7 +114,14 @@ def stitch(files, model_type, outdir, scale_factor, compare_result=True):
         img_mbb = img_mbb.astype(np.float32) * 255.
         img_mbb = np.clip(img_mbb, 0, 255).astype('uint8')
         img_mbb = img_mbb[0, :, :, :]
-        print(f"=> Shape im_merge: {img_merge.shape}, shape of img_mbb: {img_mbb.shape}")
+
+        # out_seam_img=os.path.join(outdir, "seam_blending_" + suffix + ".jpg")
+        # img_seam = panow.pano_stitch_single_camera(files, out_filename=out_seam_img, multi_band_blend=-25, return_img=True)
+        # img_seam = img_seam.astype(np.float32) * 255.
+        # img_seam = np.clip(img_seam, 0, 255).astype('uint8')
+        # img_seam = img_seam[0, :, :, :]
+
+        # print(f"=> Shape im_merge: {img_merge.shape}, shape of img_mbb: {img_mbb.shape}, shape of img_seam: {img_seam.shape}")
 
     if model_type == "ddis" or model_type == "unddis":
         # Pad image with zeros to the nearest power of 2

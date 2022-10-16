@@ -26,8 +26,8 @@ hparams = {
            'content_weight': 1e-1, # 1e-5,
            'style_weight': 4e-9,
            'simple_weight': 2e-1, # 4e-5, # 4e-9,
-           'gradient_weight': 4e-1,
-           'tv_weight': 4e-8, # 4e-7,
+           'gradient_weight': 4e+1, # 4e-1,
+           'tv_weight': 4e-6, # 4e-7,
            'learning_rate': 0.001,
            'residual_filters': 128,
            'residual_layers': 5,
@@ -138,6 +138,13 @@ def patchyfy(img, patch_shape, step=32):
 
 
 def make_raw_patches(x, patch_size, channels=3, step=1, verbose=1):
-    '''x shape: (num_channels, rows, cols)'''
+    '''x shape: (rows, cols, num_channels)'''
+
+    w_shape = x.shape - np.array([patch_size, patch_size, channels])
+    if (w_shape<0).any():
+        r_plus = -1*min(w_shape[0], 0)
+        c_plus = -1*min(w_shape[1], 0)
+        x = np.pad(x, ((0,r_plus), (0,c_plus), (0, 0)), 'symmetric')
+
     patches = patchify.patchify(x, (patch_size, patch_size, channels), step=step)
     return patches

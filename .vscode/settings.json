@@ -4,5 +4,6 @@
     "python.linting.pylamaEnabled": false,
     "python.linting.mypyEnabled": false,
     "python.linting.prospectorEnabled": false,
-    "python.terminal.activateEnvironment": true
+    "python.terminal.activateEnvironment": true,
+    "python.analysis.typeCheckingMode": "off"
 }

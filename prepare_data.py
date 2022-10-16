@@ -106,7 +106,7 @@ class TrainingSample:
             # Total number of channels
             c = data.shape[-1]
             # Number of images
-            n = int(c / 3)
+            n = int(c // 3)
             # Shuffle layer order on the training samples
             data[:, :, np.arange(c)] = data[:, :, np.random.permutation(np.arange(c).reshape(n,3)).ravel()]
         np.savez_compressed(self.get_target_path(), data=data)
@@ -120,7 +120,8 @@ class TrainingSample:
 
 class Dataset:
     def __init__(self, datasetID, total_img, nb_cameras, nb_img_generate, img_pattern,
-                 image_folder, imgfs="MCMI", input_img_dir=None, scale_factor=1.0, config_output_file=None, training_config_dict=None):
+                 image_folder, imgfs="MCMI", input_img_dir=None, scale_factor=1.0, 
+                 config_output_file=None, training_config_dict=None):
         """
         Class to Generate the dataset from Pano Stitcher
         :param datasetID:
@@ -164,7 +165,7 @@ class Dataset:
             self.dataset_settings.clear()
             self.dataset_settings["total_dataset"] = 0
             self.dataset_settings["total_samples"] = 0
-            write_json_file(cfg.config_img_output, data=self.dataset_settings)
+            write_json_file(self.config_output_file, data=self.dataset_settings)
 
         if str(self.dataset_id) not in self.dataset_settings:
             self.dataset_settings[str(self.dataset_id)] = {
@@ -173,8 +174,8 @@ class Dataset:
                 "scale_factor": self.scale_factor,
                 "patchX": 0,
                 "patchY": 0,
-                "patchSizeX": cfg.patch_size,
-                "patchSizeY": cfg.patch_size,
+                "patchSizeX": 0,
+                "patchSizeY": 0,
             }
             self.dataset_settings["total_dataset"] += 1
 
@@ -187,6 +188,7 @@ class Dataset:
         p = np.array(mat, copy=False)
         p[p < 0] = 0  # Replace negative values with zeros
         p[p > 1] = 1  # clip values greater than ones
+        p[~np.isfinite(p)] = 0  # replace non-finite values (nan, inf, etc.) with zeros
         return p
 
     def set_dataset_settings(self, key, value):
@@ -276,6 +278,7 @@ class Dataset:
 
             self.write_sample(self.get_dataset_settings("nb_imgs"), pmat_merge, pmat_target, cfg.patch_step,
                             cfg.patch_size)
+        return panow.img_height, panow.img_width, panow.img_channels
 
     def generate_un_dataset(self):
         """Generate Dataset for Unsupervised Training"""
@@ -358,6 +361,7 @@ class Dataset:
 
             self.write_sample(self.get_dataset_settings("nb_imgs"), pmat_merge, pmat_target, cfg.un_patch_step,
                             cfg.un_patch_size)
+        return panow.img_height, panow.img_width, panow.img_channels
 
     def write_sample(self, img_id, img, target, step, patch_size):
 
@@ -402,6 +406,8 @@ def prepare_data_live(args):
     print("Argument: ", args, " - is supervised? ", args.supervised)
     image_folder = cfg.image_folder if args.supervised else cfg.un_image_folder
     config_output_file = cfg.config_img_output if args.supervised else cfg.un_config_img_output
+    patch_size = cfg.patch_size if args.supervised else cfg.un_patch_size
+    patch_step = cfg.patch_step if args.supervised else cfg.un_patch_step
     
     # Read the input of the new data file settings
     data_file_settings = read_json_file(cfg.config_img_input)
@@ -411,6 +417,7 @@ def prepare_data_live(args):
 
     print(data_file_settings)
     global_scale_factor = data_file_settings.get("global_scale_factor", 1.0)
+    m_dataset_id = 0
     for datasetID, dataset_dc in data_file_settings.items():
         print("datasetID", datasetID, ", dataset_dc", dataset_dc)
         if not isinstance(dataset_dc, dict):
@@ -426,13 +433,44 @@ def prepare_data_live(args):
         # print("==>", img_pattern)
         # scale_factor = scale_factor*2 if args.supervised else scale_factor*2
         scale_factor = scale_factor*global_scale_factor
-        ds = Dataset(datasetID, total_img, nb_cameras, nb_img_generate, img_pattern, image_folder, imgfs,
+        ds = Dataset(f"{m_dataset_id}", total_img, nb_cameras, nb_img_generate, img_pattern, image_folder, imgfs,
                      input_img_dir, scale_factor, config_output_file, training_config_dict)
+        m_dataset_id += 1
 
         if args.supervised:
-            ds.generate_dataset()
+            img_h, img_w, img_c = ds.generate_dataset()
         else:
-            ds.generate_un_dataset()
+            img_h, img_w, img_c = ds.generate_un_dataset()
+        print(f"Image size: {img_h}x{img_w}x{img_c}")
+        
+        if img_h and img_w:
+            # Compute the number of patches windows
+            nb_windows_h = int((img_h - patch_size) / patch_step)
+            # nb_windows_w = int((img_w - path_size) / patch_step)
+            
+            # Generate a maximum of 5 level including 1
+            a = np.linspace(nb_windows_h, 0, num=5, dtype=int)
+            # ensure uniqueness and ignore the first one.
+            c = a[np.sort(np.unique(a, return_index=True)[1])][1:]
+            list_kh = c[c >= 0] # remove negative number
+            print(f"list_kh => {list_kh}")
+            for k_h in list_kh:
+                exp_out_size_h = patch_step * k_h + patch_size
+                scale_factor_h = img_h / exp_out_size_h
+
+                scale_factor_h *= scale_factor
+                m_ds = Dataset(f"{m_dataset_id}", total_img, nb_cameras, nb_img_generate, img_pattern, image_folder, imgfs,
+                            input_img_dir, scale_factor_h, config_output_file, training_config_dict)
+                m_dataset_id += 1
+                
+                if args.supervised:
+                    m_ds.generate_dataset()
+                else:
+                    m_ds.generate_un_dataset()
+                print(f"k_h: {k_h} - Image size [scale={scale_factor_h}]: {img_h}x{img_w}x{img_c}")
+                # for k_w in range(nb_windows_w-1, -1, -1):
+                #     exp_out_size_w = patch_step * k_w + patch_size
+                #     scale_factor_w = img_w / exp_out_size_w
 
 if __name__ == "__main__":
 

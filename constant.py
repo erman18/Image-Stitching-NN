@@ -15,8 +15,8 @@ pano_libs_dir = libs_dir + "/pano"
 pano_config_file = project_setting_dir + "/config.cfg"
 
 # Data preparation settings
-patch_size = 256
-patch_step = 64
+patch_size = 512
+patch_step = 128
 un_patch_size = 256 #Default: 512 Unsupervised patch size
 un_patch_step = 96 # Default: 256 Unsupervised step size
 sandfall_layer = -5

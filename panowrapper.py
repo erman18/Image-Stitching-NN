@@ -29,6 +29,9 @@ class PanoWrapper:
         self.scale_factor_y = scale_factor_y
         self.pano_stitch = None
         self.pano_stitch_init = False
+        self.img_height = 0
+        self.img_width = 0
+        self.img_channels = 0
         # help(pano)
 
         if self.verbose:
@@ -54,6 +57,9 @@ class PanoWrapper:
         self.pano_stitch = None
         try:
             mat = pano_stitch.build(self.scale_factor_x, self.scale_factor_y, multi_band_blend)
+            self.img_height = mat.rows()
+            self.img_width = mat.cols()
+            self.img_channels = mat.channels()
             self.pano_stitch_init = True
             self.pano_stitch = pano_stitch
             return mat
@@ -119,8 +125,9 @@ class PanoWrapper:
                                 ** -1 for merge blending, 
                                 ** 0 for linear blending, 
                                 ** k>0 for multiband blending.
-                                ** k<-1 trigger the execution of the sandfall method with the number of layers being abs(k).
+                                ** k<-1 and k>-20 trigger the execution of the sandfall method with the number of layers being abs(k).
                                 Merge blending result cannot be saved directly a file.
+                                ** k<-20 trigger seam blending
         :param return_img: if True the resulting stitched image will be returned.
                             The result image would be a numpy array
         :return: A numpy array of the stitched image
@@ -147,7 +154,7 @@ class PanoWrapper:
 
         mat = self.build_pano(img_paths, multi_band_blend)
 
-        if out_filename and multi_band_blend > 0:
+        if out_filename and not (multi_band_blend < 0 and multi_band_blend > -20):
             pano.write_img(out_filename, mat)
 
         if return_img:

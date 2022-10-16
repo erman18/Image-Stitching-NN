@@ -159,7 +159,7 @@ def train(height, width, nb_epochs=10, batch_size=32, save_arch=False, load_weig
     callback_list.append(tensorboard)
     all_callbacks = callbacks.CallbackList(callback_list, add_history=True, model=model)
 
-    optimizer = tf.keras.optimizers.Adam(learning_rate=1e-3)
+    optimizer = tf.keras.optimizers.Adam(learning_rate=1e-6, epsilon=0.01)
 
     total_loss_avg = tf.keras.metrics.Mean(name='Total Loss')
     style_loss_avg = tf.keras.metrics.Mean(name='Style Loss')
@@ -217,6 +217,7 @@ def train(height, width, nb_epochs=10, batch_size=32, save_arch=False, load_weig
             c_loss = img_utils.content_loss(target_batch_feature_maps[img_utils.hparams['content_layer_index']],
                                   output_batch_feature_maps[img_utils.hparams['content_layer_index']])     
             c_loss *= img_utils.hparams['content_weight']
+            # c_loss = tf.cond(tf.math.is_nan(c_loss), lambda: 0.0, lambda: c_loss)
 
             # s_loss = img_utils.style_loss(target_batch_feature_maps, 
             #                     output_batch_feature_maps)
@@ -224,9 +225,13 @@ def train(height, width, nb_epochs=10, batch_size=32, save_arch=False, load_weig
             s_loss = 0
 
             grad_loss = img_utils.hparams['gradient_weight'] * img_utils.gradient_loss(y_batch, y_pred_clip)
+            # grad_loss = tf.cond(tf.math.is_nan(grad_loss), lambda: 0.0, lambda: grad_loss)
 
             mse_loss = img_utils.hparams['simple_weight'] * tf.reduce_mean(simple_loss_fn(y_batch, y_pred_clip))
+            # mse_loss = tf.cond(tf.math.is_nan(mse_loss), lambda: 0.0, lambda: mse_loss)
+
             tv_loss = img_utils.hparams['tv_weight'] * img_utils.total_variation_loss(output_batch)
+            # tv_loss = tf.cond(tf.math.is_nan(tv_loss), lambda: 0.0, lambda: tv_loss)
 
             main_loss = c_loss + s_loss + mse_loss + grad_loss + tv_loss
             total_loss = tf.add_n([main_loss] + model.losses)
