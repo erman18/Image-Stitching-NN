@@ -162,8 +162,9 @@ import prepare_data as psd
 
 def new_py_function(func, inp, Tout, name=None):
     def wrapped_func(*flat_inp):
-        reconstructed_inp = tf.nest.pack_sequence_as(inp, flat_inp,
-                                                     expand_composites=True)
+        reconstructed_inp = tf.nest.pack_sequence_as(
+            inp, flat_inp, expand_composites=True
+        )
         out = func(*reconstructed_inp)
         return tf.nest.flatten(out, expand_composites=True)
 
@@ -172,9 +173,9 @@ def new_py_function(func, inp, Tout, name=None):
         func=wrapped_func,
         inp=tf.nest.flatten(inp, expand_composites=True),
         Tout=[_tensor_spec_to_dtype(v) for v in flat_Tout],
-        name=name)
-    spec_out = tf.nest.map_structure(_dtype_to_tensor_spec, Tout,
-                                     expand_composites=True)
+        name=name,
+    )
+    spec_out = tf.nest.map_structure(_dtype_to_tensor_spec, Tout, expand_composites=True)
     out = tf.nest.pack_sequence_as(spec_out, flat_out, expand_composites=True)
     return out
 
@@ -185,6 +186,7 @@ def _dtype_to_tensor_spec(v):
 
 def _tensor_spec_to_dtype(v):
     return v.dtype if isinstance(v, tf.TensorSpec) else v
+
 
 # def load_data_sample(img_paths, dim, n_channels, training_folder):
 
@@ -201,7 +203,7 @@ def _tensor_spec_to_dtype(v):
 # def load_data_sample(sample_id, config_data, training_folder):
 #     if type(sample_id) != int:
 #         sample_id = int(sample_id.numpy())
-#         assert type(sample_id) == int 
+#         assert type(sample_id) == int
 
 #     dataset_id, patchx_id, patchy_id, img_id, total_imgs, nb_cameras = get_sample_from_index(sample_id, config_data)
 
@@ -216,27 +218,28 @@ def _tensor_spec_to_dtype(v):
 def load_data_sample(sample_path, target_path):
 
     with np.load(sample_path.numpy().decode("utf-8")) as data:
-        X = data['data']
+        X = data["data"]
 
     with np.load(target_path.numpy().decode("utf-8")) as data:
-        y = data['data']
-        
+        y = data["data"]
+
     return X, y
 
 
 def get_path_from_index(index, config_data, training_folder):
-     
+
     if type(index) != int:
         index = int(index.numpy())
         assert type(index) == int
-    
+
     dataset_id = -1
     adj_idx = index
     end_range = 0
 
     for idx in range(config_data["total_dataset"]):
-        nb_patch_per_img = config_data[str(idx)]["patchX"] * \
-            config_data[str(idx)]["patchY"]
+        nb_patch_per_img = (
+            config_data[str(idx)]["patchX"] * config_data[str(idx)]["patchY"]
+        )
 
         prev_end_range = end_range
         end_range += config_data[str(idx)]["nb_imgs"] * nb_patch_per_img
@@ -250,8 +253,9 @@ def get_path_from_index(index, config_data, training_folder):
     if dataset_id < 0:
         raise ValueError(f"Invalid index: {index}")
 
-    nb_patch_per_img = config_data[str(dataset_id)]["patchX"] * \
-        config_data[str(dataset_id)]["patchY"]
+    nb_patch_per_img = (
+        config_data[str(dataset_id)]["patchX"] * config_data[str(dataset_id)]["patchY"]
+    )
 
     total_imgs = config_data[str(dataset_id)]["nb_imgs"]
     nb_cameras = config_data[str(dataset_id)]["nb_cameras"]
@@ -259,43 +263,54 @@ def get_path_from_index(index, config_data, training_folder):
     img_idx, patch_id = np.divmod(adj_idx, nb_patch_per_img)
     patchx_id, patchy_id = np.divmod(patch_id, config_data[str(dataset_id)]["patchY"])
 
-    ts = psd.TrainingSample(datasetID=dataset_id, imgID=img_idx, 
-                            patchX=patchx_id, patchY=patchy_id, 
-                            image_folder=training_folder.numpy().decode("utf-8"),
-                            nb_cameras=nb_cameras)
+    ts = psd.TrainingSample(
+        datasetID=dataset_id,
+        imgID=img_idx,
+        patchX=patchx_id,
+        patchY=patchy_id,
+        image_folder=training_folder.numpy().decode("utf-8"),
+        nb_cameras=nb_cameras,
+    )
 
     return ts.get_sample_path(), ts.get_target_path()
 
+
 @tf.function
-def read_img_dataset(list_ids, config_data, callee, batch_size=32, dim=(256, 256),
-                     n_channels=15, shuffle=True, seed=None, buffer_size=tf.data.AUTOTUNE):
+def read_img_dataset(
+    list_ids,
+    config_data,
+    callee,
+    batch_size=32,
+    dim=(256, 256),
+    n_channels=15,
+    shuffle=True,
+    seed=None,
+    buffer_size=tf.data.AUTOTUNE,
+):
 
     print("callee: %s" % callee, len(list_ids))
 
     dataset = tf.data.Dataset.from_tensor_slices(list_ids)
 
-    dataset = dataset.map(lambda item1, item2=config_data, item3=str(cfg.image_folder):
-        new_py_function(
-            get_path_from_index,
-            inp=[item1, item2, item3],
-            Tout=[tf.string, tf.string]
+    dataset = dataset.map(
+        lambda item1, item2=config_data, item3=str(cfg.image_folder): new_py_function(
+            get_path_from_index, inp=[item1, item2, item3], Tout=[tf.string, tf.string]
         ),
-            num_parallel_calls=tf.data.AUTOTUNE
-        ).cache()  #
-        
-    dataset = dataset.map(lambda sample_path, target_path:
-        tf.py_function(
+        num_parallel_calls=tf.data.AUTOTUNE,
+    ).cache()  #
+
+    dataset = dataset.map(
+        lambda sample_path, target_path: tf.py_function(
             load_data_sample,
             inp=[sample_path, target_path],
-            Tout=[tf.float32, tf.float32]
+            Tout=[tf.float32, tf.float32],
         ),
-            num_parallel_calls=tf.data.AUTOTUNE
-        )  #
-        
+        num_parallel_calls=tf.data.AUTOTUNE,
+    )  #
 
     dataset = dataset.repeat(1).prefetch(tf.data.AUTOTUNE)
     dataset = dataset.batch(batch_size=batch_size)
-    dataset = dataset.prefetch(buffer_size) #.cache()
+    dataset = dataset.prefetch(buffer_size)  # .cache()
 
     return dataset
 
@@ -328,7 +343,7 @@ if __name__ == "__main__":
     # print(len(x_train))
 
     # d1 = DataGenerator([*range(config_data["total_samples"])], config_data, dim=(cfg.patch_size, cfg.patch_size))
-    
+
     # list_paths = d1.generate_img_path()
     # print(list_paths[0:2])
     # X, Y = load_data_sample(list_paths[2], dim=None, n_channels=None, training_folder=str(cfg.image_folder))

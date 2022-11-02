@@ -6,32 +6,33 @@ from tensorflow.keras.layers import Conv1D, Conv2D, Conv3D
 from tensorflow.keras.layers import MaxPool1D
 
 from tensorflow.keras.callbacks import Callback, TensorBoard
+
 # from keras.engine.topology import Layer
 from tensorflow.keras import backend as K
 
-''' Callbacks '''
+""" Callbacks """
 
 
 class HistoryCheckpoint(Callback):
-    '''Callback that records events
-        into a `History` object.
+    """Callback that records events
+    into a `History` object.
 
-        It then saves the history after each epoch into a file.
-        To read the file into a python dict:
-            history = {}
-            with open(filename, "r") as f:
-                history = eval(f.read())
-
-        This may be unsafe since eval() will evaluate any string
-        A safer alternative:
-
-        import ast
-
+    It then saves the history after each epoch into a file.
+    To read the file into a python dict:
         history = {}
         with open(filename, "r") as f:
-            history = ast.literal_eval(f.read())
+            history = eval(f.read())
 
-    '''
+    This may be unsafe since eval() will evaluate any string
+    A safer alternative:
+
+    import ast
+
+    history = {}
+    with open(filename, "r") as f:
+        history = ast.literal_eval(f.read())
+
+    """
 
     def __init__(self, filename):
         super(Callback, self).__init__()
@@ -52,35 +53,40 @@ class HistoryCheckpoint(Callback):
             f.write(str(self.history))
 
 
-'''
+"""
 Below is a modification to the TensorBoard callback to perform 
 batchwise writing to the tensorboard, instead of only at the end
 of the batch.
-'''
+"""
 
 
 class TensorBoardBatch(TensorBoard):
-    def __init__(self, log_dir='./logs',
-                 histogram_freq=0,
-                 batch_size=32,
-                 init_step = 1, # This field help if we want to continue with the history afer a restart
-                 write_graph=True,
-                 write_grads=False,
-                 write_images=False,
-                 embeddings_freq=0,
-                 profile_batch=(2000,2010),
-                 embeddings_layer_names=None,
-                 embeddings_metadata=None):
-        super(TensorBoardBatch, self).__init__(log_dir,
-                                               histogram_freq=histogram_freq,
-                                            #    batch_size=batch_size,
-                                               profile_batch=profile_batch,
-                                               write_graph=write_graph,
-                                               write_grads=write_grads,
-                                               write_images=write_images,
-                                               embeddings_freq=embeddings_freq,
-                                               embeddings_layer_names=embeddings_layer_names,
-                                               embeddings_metadata=embeddings_metadata)
+    def __init__(
+        self,
+        log_dir="./logs",
+        histogram_freq=0,
+        batch_size=32,
+        init_step=1,  # This field help if we want to continue with the history afer a restart
+        write_graph=True,
+        write_grads=False,
+        write_images=False,
+        embeddings_freq=0,
+        profile_batch=(2000, 2010),
+        embeddings_layer_names=None,
+        embeddings_metadata=None,
+    ):
+        super(TensorBoardBatch, self).__init__(
+            log_dir,
+            histogram_freq=histogram_freq,
+            #    batch_size=batch_size,
+            profile_batch=profile_batch,
+            write_graph=write_graph,
+            write_grads=write_grads,
+            write_images=write_images,
+            embeddings_freq=embeddings_freq,
+            embeddings_layer_names=embeddings_layer_names,
+            embeddings_metadata=embeddings_metadata,
+        )
 
         # conditionally import tensorflow iff TensorBoardBatch is created
         # self.tf = __import__('tensorflow')
@@ -91,7 +97,7 @@ class TensorBoardBatch(TensorBoard):
         logs = logs or {}
 
         for name, value in logs.items():
-            if name in ['batch', 'size']:
+            if name in ["batch", "size"]:
                 continue
 
             with self.writer.as_default():
@@ -105,9 +111,9 @@ class TensorBoardBatch(TensorBoard):
         logs = logs or {}
 
         for name, value in logs.items():
-            if name in ['batch', 'size']:
+            if name in ["batch", "size"]:
                 continue
-            
+
             with self.writer.as_default():
                 tf.summary.scalar(name, value, self.global_step)
 
@@ -115,7 +121,7 @@ class TensorBoardBatch(TensorBoard):
         self.writer.flush()
 
 
-''' Theano Backend function '''
+""" Theano Backend function """
 
 #
 # def depth_to_scale(x, scale, output_shape, dim_ordering=K.image_dim_ordering(), name=None):
@@ -180,7 +186,7 @@ class TensorBoardBatch(TensorBoard):
 #     return out
 
 
-''' Tensorflow Backend Function '''
+""" Tensorflow Backend Function """
 
 
 def depth_to_scale_tf(input, scale, channels):
@@ -189,11 +195,12 @@ def depth_to_scale_tf(input, scale, channels):
     except ImportError:
         print(
             "Could not import Tensorflow for depth_to_scale operation. Please install Tensorflow or switch to Theano "
-            "backend")
+            "backend"
+        )
         exit()
 
     def _phase_shift(I, r):
-        ''' Function copied as is from https://github.com/Tetrachrome/subpixel/blob/master/subpixel.py'''
+        """Function copied as is from https://github.com/Tetrachrome/subpixel/blob/master/subpixel.py"""
 
         bsize, a, b, c = I.get_shape().as_list()
         bsize = tf.shape(I)[0]  # Handling Dimension(None) type for undefined batch dim
@@ -213,9 +220,9 @@ def depth_to_scale_tf(input, scale, channels):
     return X
 
 
-'''
+"""
 Implementation is incomplete. Use lambda layer for now.
-'''
+"""
 
 #
 # class SubPixelUpscaling(Layer):
@@ -245,15 +252,17 @@ Implementation is incomplete. Use lambda layer for now.
 #             return b, r * self.r, c * self.r, self.channels
 
 
-''' Non Local Blocks '''
+""" Non Local Blocks """
 
 
-def non_local_block(ip, computation_compression=2, mode='embedded'):
-    channel_dim = 1 if K.image_data_format() == 'channels_first' else -1
+def non_local_block(ip, computation_compression=2, mode="embedded"):
+    channel_dim = 1 if K.image_data_format() == "channels_first" else -1
     ip_shape = K.int_shape(ip)
 
-    if mode not in ['gaussian', 'embedded', 'dot', 'concatenate']:
-        raise ValueError('`mode` must be one of `gaussian`, `embedded`, `dot` or `concatenate`')
+    if mode not in ["gaussian", "embedded", "dot", "concatenate"]:
+        raise ValueError(
+            "`mode` must be one of `gaussian`, `embedded`, `dot` or `concatenate`"
+        )
 
     dim1, dim2, dim3 = None, None, None
 
@@ -278,15 +287,17 @@ def non_local_block(ip, computation_compression=2, mode='embedded'):
             batchsize, dim1, dim2, dim3, channels = ip_shape
 
     else:
-        raise ValueError('Input dimension has to be either 3 (temporal), 4 (spatial) or 5 (spatio-temporal)')
+        raise ValueError(
+            "Input dimension has to be either 3 (temporal), 4 (spatial) or 5 (spatio-temporal)"
+        )
 
-    if mode == 'gaussian':  # Gaussian instantiation
+    if mode == "gaussian":  # Gaussian instantiation
         x1 = Reshape((-1, channels))(ip)  # xi
         x2 = Reshape((-1, channels))(ip)  # xj
         f = dot([x1, x2], axes=2)
-        f = Activation('softmax')(f)
+        f = Activation("softmax")(f)
 
-    elif mode == 'dot':  # Dot instantiation
+    elif mode == "dot":  # Dot instantiation
         # theta path
         theta = _convND(ip, rank, channels // 2)
         theta = Reshape((-1, channels // 2))(theta)
@@ -299,12 +310,12 @@ def non_local_block(ip, computation_compression=2, mode='embedded'):
 
         # scale the values to make it size invariant
         if batchsize is not None:
-            f = Lambda(lambda z: 1. / batchsize * z)(f)
+            f = Lambda(lambda z: 1.0 / batchsize * z)(f)
         else:
-            f = Lambda(lambda z: 1. / 128 * z)(f)
+            f = Lambda(lambda z: 1.0 / 128 * z)(f)
 
-    elif mode == 'concatenate':  # Concatenation instantiation
-        raise NotImplemented('Concatenation mode has not been implemented yet')
+    elif mode == "concatenate":  # Concatenation instantiation
+        raise NotImplemented("Concatenation mode has not been implemented yet")
 
     else:  # Embedded Gaussian instantiation
         # theta path
@@ -320,13 +331,13 @@ def non_local_block(ip, computation_compression=2, mode='embedded'):
             phi = MaxPool1D(computation_compression)(phi)
 
         f = dot([theta, phi], axes=2)
-        f = Activation('softmax')(f)
+        f = Activation("softmax")(f)
 
     # g path
     g = _convND(ip, rank, channels // 2)
     g = Reshape((-1, channels // 2))(g)
 
-    if computation_compression > 1 and mode == 'embedded':
+    if computation_compression > 1 and mode == "embedded":
         # shielded computation
         g = MaxPool1D(computation_compression)(g)
 
@@ -360,9 +371,9 @@ def _convND(ip, rank, channels):
     assert rank in [3, 4, 5], "Rank of input must be 3, 4 or 5"
 
     if rank == 3:
-        x = Conv1D(channels, 1, padding='same', use_bias=False)(ip)
+        x = Conv1D(channels, 1, padding="same", use_bias=False)(ip)
     elif rank == 4:
-        x = Conv2D(channels, (1, 1), padding='same', use_bias=False)(ip)
+        x = Conv2D(channels, (1, 1), padding="same", use_bias=False)(ip)
     else:
-        x = Conv3D(channels, (1, 1, 1), padding='same', use_bias=False)(ip)
+        x = Conv3D(channels, (1, 1, 1), padding="same", use_bias=False)(ip)
     return x

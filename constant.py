@@ -1,8 +1,8 @@
 import logging
 
 # create formatter
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-logging_format = '%(asctime)s: %(levelname)s:%(message)s'
+formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+logging_format = "%(asctime)s: %(levelname)s:%(message)s"
 dataset_folder = "/mnt/data/enghonda/deepstitch-dataset"
 image_folder = f"{dataset_folder}/training_data"
 un_image_folder = f"{dataset_folder}/un_training_data"
@@ -17,16 +17,18 @@ pano_config_file = project_setting_dir + "/config.cfg"
 # Data preparation settings
 patch_size = 512
 patch_step = 128
-un_patch_size = 256 #Default: 512 Unsupervised patch size
-un_patch_step = 96 # Default: 256 Unsupervised step size
+un_patch_size = 256  # Default: 512 Unsupervised patch size
+un_patch_step = 96  # Default: 256 Unsupervised step size
 sandfall_layer = -5
 
 config_img_input = project_setting_dir + "/config_input_file.json"
 config_img_output = image_folder + "/config_output_file.json"
 un_config_img_output = un_image_folder + "/config_output_file.json"
 
+
 class Colors:
-    """ ANSI color codes """
+    """ANSI color codes"""
+
     BLACK = "\033[0;30m"
     RED = "\033[0;31m"
     GREEN = "\033[0;32m"
@@ -64,6 +66,13 @@ class Colors:
             del kernel32
 
 
-def PRINT_INFO(msg):print(f"{Colors.GREEN}{msg}{Colors.END}")
-def PRINT_WARNING(msg):print(f"{Colors.YELLOW}{msg}{Colors.END}")
-def PRINT_ERROR(msg):print(f"{Colors.YELLOW}{msg}{Colors.END}")
+def PRINT_INFO(msg):
+    print(f"{Colors.GREEN}{msg}{Colors.END}")
+
+
+def PRINT_WARNING(msg):
+    print(f"{Colors.YELLOW}{msg}{Colors.END}")
+
+
+def PRINT_ERROR(msg):
+    print(f"{Colors.YELLOW}{msg}{Colors.END}")

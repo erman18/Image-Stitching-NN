@@ -15,13 +15,14 @@ sys.path.append(cfg.pano_libs_dir)
 try:
     import libpyopenpano as pano
 except:
-    ValueError("Couldn't import 'libpyopenpano' library. You may need to use the shell "
-               "script (*.sh files) to run this module or export LD_LIBRARY_PATH variable.\n"
-               "    => Ex: export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$LIB_DIR && python prepare_stitching_data.py")
+    ValueError(
+        "Couldn't import 'libpyopenpano' library. You may need to use the shell "
+        "script (*.sh files) to run this module or export LD_LIBRARY_PATH variable.\n"
+        "    => Ex: export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$LIB_DIR && python prepare_stitching_data.py"
+    )
 
 
 class PanoWrapper:
-
     def __init__(self, scale_factor_x=1.0, scale_factor_y=1.0, verbose=0):
         pano.init_config(cfg.pano_config_file)
         self.verbose = verbose
@@ -56,7 +57,9 @@ class PanoWrapper:
         self.pano_stitch_init = False
         self.pano_stitch = None
         try:
-            mat = pano_stitch.build(self.scale_factor_x, self.scale_factor_y, multi_band_blend)
+            mat = pano_stitch.build(
+                self.scale_factor_x, self.scale_factor_y, multi_band_blend
+            )
             self.img_height = mat.rows()
             self.img_width = mat.cols()
             self.img_channels = mat.channels()
@@ -64,7 +67,9 @@ class PanoWrapper:
             self.pano_stitch = pano_stitch
             return mat
         except:
-            raise RuntimeError(f"Error: Failed to calibrate the input images {calib_files}")
+            raise RuntimeError(
+                f"Error: Failed to calibrate the input images {calib_files}"
+            )
 
     def init_pano_from_dir(self, img_pattern, nb_cameras, nb_images):
         """
@@ -83,25 +88,34 @@ class PanoWrapper:
 
         for img_id in range(0, nb_images):
 
-            file_list = [img_pattern.format(camID=i, imgID=img_id) for i in range(nb_cameras)]
+            file_list = [
+                img_pattern.format(camID=i, imgID=img_id) for i in range(nb_cameras)
+            ]
 
             try:
                 self.init_pano_stitcher(file_list, multi_band_blend)
                 print(f"files: {file_list}")
                 break
             except ValueError:
-                cfg.PRINT_WARNING(f"Error: Please check image exists to the specified location - {file_list}")
+                cfg.PRINT_WARNING(
+                    f"Error: Please check image exists to the specified location - {file_list}"
+                )
                 raise RuntimeError("Please, check filenames")
             except Exception as e:
-                cfg.PRINT_WARNING(f"{e}\nError: Cannot stitch images [{img_id}/{nb_images}]")
+                cfg.PRINT_WARNING(
+                    f"{e}\nError: Cannot stitch images [{img_id}/{nb_images}]"
+                )
                 time.sleep(0.05)
 
         if not self.pano_stitch_init:
-            raise RuntimeError("Failed to find the projection parameters. Please add calibration "
-                               "images in the same director as the images")
+            raise RuntimeError(
+                "Failed to find the projection parameters. Please add calibration "
+                "images in the same director as the images"
+            )
 
     def build_pano(self, img_paths, multi_band_blend, shuffle=True):
-        if not self.pano_stitch: return None
+        if not self.pano_stitch:
+            return None
         for img_path in img_paths:
             if not os.path.isfile(img_path):
                 raise ValueError(f"Error: Image file {img_path} does not exists")
@@ -111,19 +125,26 @@ class PanoWrapper:
         return mat
 
     def write_img(self, path, mat):
-        if not self.pano_stitch: return None
+        if not self.pano_stitch:
+            return None
         pano.write_img(path, mat)
 
-    def pano_stitch_single_camera(self, img_paths: list, out_filename=None, calib_files=None, return_img=False,
-                                  multi_band_blend=0):
+    def pano_stitch_single_camera(
+        self,
+        img_paths: list,
+        out_filename=None,
+        calib_files=None,
+        return_img=False,
+        multi_band_blend=0,
+    ):
         """
 
         :param img_paths: The list of the image paths to stitched
         :param out_filename: The output filename
         :param calib_files: Camera calibration image file if exists
         :param multi_band_blend: Indicate the blending method
-                                ** -1 for merge blending, 
-                                ** 0 for linear blending, 
+                                ** -1 for merge blending,
+                                ** 0 for linear blending,
                                 ** k>0 for multiband blending.
                                 ** k<-1 and k>-20 trigger the execution of the sandfall method with the number of layers being abs(k).
                                 Merge blending result cannot be saved directly a file.
@@ -137,7 +158,9 @@ class PanoWrapper:
             try:
                 self.init_pano_stitcher(calib_files, multi_band_blend)
             except:
-                cfg.PRINT_WARNING(f"Error: Failed to calibrate the input images {calib_files}")
+                cfg.PRINT_WARNING(
+                    f"Error: Failed to calibrate the input images {calib_files}"
+                )
                 # if self.pano_stitch_init:
                 #     self.init_pano_stitcher(img_paths, multi_band_blend)
 
@@ -145,8 +168,9 @@ class PanoWrapper:
                 try:
                     self.init_pano_stitcher(img_paths, multi_band_blend)
                 except:
-                    raise RuntimeError(f"Error: Failed to calibrate the input images {calib_files}")
-
+                    raise RuntimeError(
+                        f"Error: Failed to calibrate the input images {calib_files}"
+                    )
 
         if not self.pano_stitch_init:
             print("Please, initialize the pano object by provide the calibration files.")
@@ -166,8 +190,18 @@ class PanoWrapper:
             X = np.zeros((1, h, w, c))
 
             X[0, :, :, :c] = p
-            print("********++++==> ", X.shape, " ~ ", p.dtype, ", non_zeros_pixels: ", non_zeros_pixel, ", multi_band_blend: ", multi_band_blend)
+            print(
+                "********++++==> ",
+                X.shape,
+                " ~ ",
+                p.dtype,
+                ", non_zeros_pixels: ",
+                non_zeros_pixel,
+                ", multi_band_blend: ",
+                multi_band_blend,
+            )
             return X
+
 
 if __name__ == "__main__":
     # prepare_data()
@@ -192,7 +226,7 @@ if __name__ == "__main__":
             "out_dir": "/media/sf_Data/data_stitching/Terrace/Out2",
             "nb_cameras": 14,
             "total_img": 430,
-        }
+        },
     ]
 
     id = 0
@@ -207,7 +241,10 @@ if __name__ == "__main__":
     stitcher = None
     for img_id in range(total_img):
         print(f"-----------------------------{img_id}------------------------")
-        file_list = [mdata[id]["img_pattern"].format(i, img_id) for i in range(mdata[id]["nb_cameras"])]
+        file_list = [
+            mdata[id]["img_pattern"].format(i, img_id)
+            for i in range(mdata[id]["nb_cameras"])
+        ]
         output_result = f"{out_dir}/{img_id:05d}.jpg"
 
         print(file_list)
@@ -227,7 +264,10 @@ if __name__ == "__main__":
     time.sleep(10)
     for img_id in range(total_img):
         print(f"-----------------------------{img_id}------------------------")
-        file_list = [mdata[id]["img_pattern"].format(i, img_id) for i in range(mdata[id]["nb_cameras"])]
+        file_list = [
+            mdata[id]["img_pattern"].format(i, img_id)
+            for i in range(mdata[id]["nb_cameras"])
+        ]
         output_result = f"{out_dir}/{img_id:05d}.jpg"
 
         try:
@@ -238,7 +278,9 @@ if __name__ == "__main__":
             # time.sleep(10)
             pano.write_img(output_result, mat)
         except:
-            print(f"[build_from_new_images] Error: Cannot stitch image [{img_id}] - [{output_result}]")
+            print(
+                f"[build_from_new_images] Error: Cannot stitch image [{img_id}] - [{output_result}]"
+            )
 
     # pano.test_extrema(mat, 1)
     print("done stitching!", nb_stitched_img)
