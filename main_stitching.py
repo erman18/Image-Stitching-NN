@@ -70,6 +70,318 @@ def calculate_ssim(img1, img2):
     else:
         raise ValueError('Wrong input image dimensions.')
 
+CST_SEAM = "seam" # Constant for seam-based
+CST_MULB = "multiband" # Constant for multiband blending
+CST_DEEP = "ours" # Constant for deep learning approach
+from scipy.linalg import sqrtm
+class FIDMetric:
+    def __init__(self, model=None) -> None:
+        self.model = model
+        self.__act1 = {
+            CST_SEAM: [],
+            CST_MULB: [],
+            CST_DEEP: [],
+        }
+        self.__act2 = {
+            CST_SEAM: [],
+            CST_MULB: [],
+            CST_DEEP: [],
+        }
+
+    def add_image_seam(self, images1, images2):
+        self.__warped_add(images1, images2, CST_SEAM)
+
+    def add_image_mbb(self, images1, images2):
+        self.__warped_add(images1, images2, CST_MULB)
+
+    def add_image_deep(self, images1, images2):
+        self.__warped_add(images1, images2, CST_DEEP)
+
+    def __warped_add(self, image1, image2, method):
+
+        if image1.shape[-1] > 3:
+            nb_layers = int(image1.shape[-1]//3)
+
+            # Save SandFall layers
+            for i in range(nb_layers):
+                img = image1[:, :, :, i*3:(i+1)*3]
+                mask = img != 0.0
+                masked_img = mask * image2
+                self.__add_image(img, masked_img, method)
+        else:
+            self.__add_image(image1, image2, method)
+
+    # calculate frechet inception distance
+    def __add_image(self, images1, images2, method):
+
+        if images1.ndim == 3:
+            images1 = np.expand_dims(images1, 0)
+        if images2.ndim == 3:
+            images2 = np.expand_dims(images2, 0)
+
+        # Assume image values are between 0 and 255.
+        processed1 = images1 / 127.5 - 1.0
+        processed2 = images2 / 127.5 - 1.0
+        # calculate activations
+        act1 = self.model.predict(processed1)
+        act2 = self.model.predict(processed2)
+        self.__act1[method].append(act1.ravel())
+        self.__act2[method].append(act2.ravel())
+    
+    # calculate frechet inception distance
+    def __calculate_fid(self, method):
+        if not (self.__act1[method] and self.__act1[method]):
+            return 0
+        act1 = np.array(self.__act1[method], dtype=np.float32)
+        act2 = np.array(self.__act2[method], dtype=np.float32)
+        # print("-------------------------------->", act2.shape)
+        # calculate mean and covariance statistics
+        mu1, sigma1 = act1.mean(axis=0), np.cov(act1, rowvar=False)
+        mu2, sigma2 = act2.mean(axis=0), np.cov(act2, rowvar=False)
+        # calculate sum squared difference between means
+        ssdiff = np.sum((mu1 - mu2)**2.0)
+        # print(sigma1, sigma2.ndim)
+        # calculate sqrt of product between cov
+        sig = sigma1.dot(sigma2)
+        if sig.ndim > 0:
+            covmean = sqrtm(sig)
+        else:
+            covmean = np.sqrt(sig)
+        # check and correct imaginary numbers from sqrt
+        if np.iscomplexobj(covmean):
+            covmean = covmean.real
+        # calculate score
+        if sig.ndim > 0:
+            fid = ssdiff + np.trace(sigma1 + sigma2 - 2.0 * covmean)
+        else:
+            fid = ssdiff + sigma1 + sigma2 - 2.0 * covmean
+        return fid
+    
+    def getvalues(self):
+        # return self.__calculate_fid()
+        return {
+            CST_SEAM: self.__calculate_fid(CST_SEAM),
+            CST_MULB: self.__calculate_fid(CST_MULB),
+            CST_DEEP: self.__calculate_fid(CST_DEEP),
+        }
+    
+    def reset(self, method):
+        self.__act1[method] = []
+        self.__act2[method] = []
+
+    def reset_all(self):
+        self.reset(CST_SEAM)
+        self.reset(CST_MULB)
+        self.reset(CST_DEEP)
+
+class ISScore:
+    def __init__(self, model=None) -> None:
+        self.model = model
+        self.__p_yx = {
+            CST_SEAM: [],
+            CST_MULB: [],
+            CST_DEEP: [],
+        }
+    
+    def add_image_seam(self, image):
+        self.__add_image(image, CST_SEAM)
+
+    def add_image_mbb(self, image):
+        self.__add_image(image, CST_MULB)
+
+    def add_image_deep(self, image):
+        self.__add_image(image, CST_DEEP)
+
+    # calculate the inception score for p(y|x)
+    def __add_image(self, image, method):
+
+        if image.ndim == 3:
+            image = np.expand_dims(image, 0)
+
+        # assume image values are between  0-255
+        processed = image.astype(np.float32) / 127.5 - 1.0
+        # calculate p(y|x)
+        p_yx = self.model.predict(processed)
+        
+        self.__p_yx[method].append(p_yx.ravel())
+    
+    # calculate the inception score for p(y|x)
+    def __calculate_inception_score(self, method, eps=1E-16):
+        if not (self.__p_yx[method]):
+            return 0
+        # calculate p(y|x)
+        p_yx = np.array(self.__p_yx[method], dtype=np.float32)
+        # calculate p(y)
+        p_y = np.expand_dims(p_yx.mean(axis=0), 0)
+        # kl divergence for each image
+        kl_d = p_yx * (np.log(p_yx + eps) - np.log(p_y + eps))
+        # sum over classes
+        sum_kl_d = kl_d.sum(axis=1)
+        # average over images
+        avg_kl_d = np.mean(sum_kl_d)
+        # undo the logs
+        is_score = np.exp(avg_kl_d)
+        return is_score
+    
+    def getvalues(self):
+        return {
+            CST_SEAM: self.__calculate_inception_score(CST_SEAM),
+            CST_MULB: self.__calculate_inception_score(CST_MULB),
+            CST_DEEP: self.__calculate_inception_score(CST_DEEP),
+        }
+    
+    def reset(self, method):
+        self.__p_yx[method] = []
+
+    def reset_all(self):
+        self.reset(CST_SEAM)
+        self.reset(CST_MULB)
+        self.reset(CST_DEEP)
+
+class SGScore:
+    def __init__(self, model=None) -> None:
+        self.model = model
+        self.__p_yx = {
+            CST_SEAM: [],
+            CST_MULB: [],
+            CST_DEEP: [],
+        }
+    
+    def add_image_seam(self, image):
+        self.__add_image(image, CST_SEAM)
+
+    def add_image_mbb(self, image):
+        self.__add_image(image, CST_MULB)
+
+    def add_image_deep(self, image):
+        self.__add_image(image, CST_DEEP)
+
+    # calculate the inception score for p(y|x)
+    def __add_image(self, image, method):
+
+        if image.ndim == 3:
+            image = np.expand_dims(image, 0)
+
+        # assume image values are between  0-255
+        processed = image.astype(np.float32) / 127.5 - 1.0
+        # calculate p(y|x)
+        p_yx = self.model.predict(processed)
+        
+        self.__p_yx[method].append(p_yx.ravel())
+    
+    # calculate the inception score for p(y|x)
+    def __calculate_inception_score(self, method, eps=1E-16):
+        if not (self.__p_yx[method]):
+            return 0
+        # calculate p(y|x)
+        p_yx = np.array(self.__p_yx[method], dtype=np.float32)
+        # calculate p(y)
+        p_y = np.expand_dims(p_yx.mean(axis=0), 0)
+        # kl divergence for each image
+        kl_d = p_yx * (np.log(p_yx + eps) - np.log(p_y + eps))
+        # sum over classes
+        sum_kl_d = kl_d.sum(axis=1)
+        # average over images
+        avg_kl_d = np.mean(sum_kl_d)
+        # undo the logs
+        sg_score = avg_kl_d # np.exp(avg_kl_d)
+        return sg_score
+    
+    def getvalues(self):
+        return {
+            CST_SEAM: self.__calculate_inception_score(CST_SEAM),
+            CST_MULB: self.__calculate_inception_score(CST_MULB),
+            CST_DEEP: self.__calculate_inception_score(CST_DEEP),
+        }
+    
+    def reset(self, method):
+        self.__p_yx[method] = []
+
+    def reset_all(self):
+        self.reset(CST_SEAM)
+        self.reset(CST_MULB)
+        self.reset(CST_DEEP)
+
+import tensorflow as tf
+from tensorflow.keras.applications.inception_v3 import InceptionV3
+
+class LPIPSMetric:
+    """ Learned Perceptual Image Patch Similarity (LPIPS) between img1 and img2 """
+
+    def __init__(self,
+                pb_fname="/home/UFAD/enghonda/.lpips/net_vgg_v0.1.pb"):
+        loaded = tf.saved_model.load(pb_fname)
+        self.frozen_func = loaded.signatures['serving_default']
+        self.__distance = {
+            CST_SEAM: [],
+            CST_MULB: [],
+            CST_DEEP: [],
+        }
+
+    def add_image_seam(self, images1, images2):
+        self.__warped_add(images1, images2, CST_SEAM)
+
+    def add_image_mbb(self, images1, images2):
+        self.__warped_add(images1, images2, CST_MULB)
+
+    def add_image_deep(self, images1, images2):
+        self.__warped_add(images1, images2, CST_DEEP)
+
+    def __warped_add(self, image1, image2, method):
+
+        if image1.shape[-1] > 3:
+            nb_layers = int(image1.shape[-1]//3)
+
+            # Save SandFall layers
+            for i in range(nb_layers):
+                img = image1[:, :, :, i*3:(i+1)*3]
+                mask = img != 0.0
+                masked_img = mask * image2
+                self.__add_image(img, masked_img, method)
+        else:
+            self.__add_image(image1, image2, method)
+
+    def __add_image(self, y_true, y_pred, method):
+
+        if y_true.ndim == 3:
+            y_true = np.expand_dims(y_true, 0)
+        if y_pred.ndim == 3:
+            y_pred = np.expand_dims(y_pred, 0)
+            
+        # calculate activations
+        input0 = np.transpose(y_true, [0, 3, 1, 2]) / 127.5 - 1.0
+        input1 = np.transpose(y_pred, [0, 3, 1, 2]) / 127.5 - 1.0
+        distance = self.frozen_func(
+            in0=tf.convert_to_tensor(input0, dtype=tf.float32), 
+            in1=tf.convert_to_tensor(input1, dtype=tf.float32)
+        )
+        
+        self.__distance[method].append(distance['185'].numpy())
+    
+    def __getdiscance(self, method):        
+        return np.array(self.__distance[method], 
+                dtype=np.float32).mean() if self.__distance[method] else 0.0
+    
+    def getvalues(self):
+        return {
+            CST_SEAM: self.__getdiscance(CST_SEAM),
+            CST_MULB: self.__getdiscance(CST_MULB),
+            CST_DEEP: self.__getdiscance(CST_DEEP),
+        }
+
+    def reset(self, method):
+        self.__distance[method] = []
+
+    def reset_all(self):
+        self.reset(CST_SEAM)
+        self.reset(CST_MULB)
+        self.reset(CST_DEEP)
+        
+fid_metric = FIDMetric()
+is_metric = ISScore()
+sg_metric = SGScore()
+lpips_metric = LPIPSMetric()
+
 def save_blending_result(img_merge, outdir, file_prefix, nb_layers=None):
     
     img_shape = img_merge.shape
@@ -93,18 +405,18 @@ def stitch(files, model_type, outdir, scale_factor, compare_result=True):
     os.makedirs(m_outdir, exist_ok=True)
     suffix = time.strftime("_%Y%m%d-%H%M%S")
     img_merge = panow.pano_stitch_single_camera(files, multi_band_blend=-1, return_img=True)
-    save_blending_result(img_merge, outdir, "merge_layer", abs(cfg.sandfall_layer))
-    img_merge = panow.pano_stitch_single_camera(files, multi_band_blend=-5, return_img=True)
+    save_blending_result(img_merge, outdir, "merge_layer", min(abs(cfg.sandfall_layer), img_merge.shape[-1]//3))
+    sandfall_block = panow.pano_stitch_single_camera(files, multi_band_blend=-5, return_img=True)
     # panow.print_config()
-    if img_merge is None:
+    if sandfall_block is None:
         print(f"failed to stitch the images {files}")
         sys.exit()
 
     # Save SandFall layers
-    save_blending_result(img_merge, outdir, "sandfall_layer", abs(cfg.sandfall_layer))
+    save_blending_result(sandfall_block, outdir, "sandfall_layer", abs(cfg.sandfall_layer))
     # for i in range(abs(cfg.sandfall_layer)):
     #     filename = os.path.join(outdir, "sandfall_layer" + str(i) + ".jpg")
-    #     img = img_merge[0, :,:, i*3:(i+1)*3]
+    #     img = sandfall_block[0, :,:, i*3:(i+1)*3]
     #     cv2.imwrite(filename, cv2.cvtColor((img*255).astype(np.uint8), cv2.COLOR_RGB2BGR))
 
     img_mbb = None
@@ -115,31 +427,52 @@ def stitch(files, model_type, outdir, scale_factor, compare_result=True):
         img_mbb = np.clip(img_mbb, 0, 255).astype('uint8')
         img_mbb = img_mbb[0, :, :, :]
 
-        # out_seam_img=os.path.join(outdir, "seam_blending_" + suffix + ".jpg")
-        # img_seam = panow.pano_stitch_single_camera(files, out_filename=out_seam_img, multi_band_blend=-25, return_img=True)
-        # img_seam = img_seam.astype(np.float32) * 255.
-        # img_seam = np.clip(img_seam, 0, 255).astype('uint8')
-        # img_seam = img_seam[0, :, :, :]
+        out_seam_img=os.path.join(outdir, "seam_blending_" + suffix + ".jpg")
+        img_seam = panow.pano_stitch_single_camera(files, out_filename=out_seam_img, multi_band_blend=-25, return_img=True)
+        img_seam = img_seam.astype(np.float32) * 255.
+        img_seam = np.clip(img_seam, 0, 255).astype('uint8')
+        img_seam = img_seam[0, :, :, :]
 
-        # print(f"=> Shape im_merge: {img_merge.shape}, shape of img_mbb: {img_mbb.shape}, shape of img_seam: {img_seam.shape}")
+        print(f"=> Shape im_merge: {sandfall_block.shape}, shape of img_mbb: {img_mbb.shape}, shape of img_seam: {img_seam.shape}")
 
     if model_type == "ddis" or model_type == "unddis":
         # Pad image with zeros to the nearest power of 2
-        h = nearest_mult_n(img_merge.shape[1]) - img_merge.shape[1]
-        w = nearest_mult_n(img_merge.shape[2]) - img_merge.shape[2]
-        img_merge = np.pad(img_merge, ((0, 0), (0, h), (0, w), (0, 0)), mode='constant')
+        h = nearest_mult_n(sandfall_block.shape[1]) - sandfall_block.shape[1]
+        w = nearest_mult_n(sandfall_block.shape[2]) - sandfall_block.shape[2]
+        sandfall_block = np.pad(sandfall_block, ((0, 0), (0, h), (0, w), (0, 0)), mode='constant')
         if compare_result:
             img_mbb = np.pad(img_mbb, ((0, h), (0, w), (0, 0)), mode='constant')
-            print(f"=> New Shape im_merge: {img_merge.shape}, shape of img_mbb: {img_mbb.shape}")
+            print(f"=> New Shape im_merge: {sandfall_block.shape}, shape of img_mbb: {img_mbb.shape}")
 
     start_time = time.time()
-    result = model.simple_stitch(img_merge, out_dir=outdir, scale_factor=scale_factor,
+    result = model.simple_stitch(sandfall_block, out_dir=outdir, scale_factor=scale_factor,
                                  suffix=model_type + str(suffix), return_image=True)
     print("--- %s seconds ---" % (time.time() - start_time))
 
     if compare_result:
         m_pnsr = calculate_psnr(img_mbb, result)
         m_ssim = calculate_ssim(img_mbb, result)
+        cfg.PRINT_INFO(f"Computing Metrics - im_mg.shape: {img_merge.shape}, result.shape: {result.shape}")
+        inceptionv3_model = InceptionV3(include_top=False, pooling='avg', input_shape=result.shape)
+        fid_metric.model = inceptionv3_model
+        is_metric.model = inceptionv3_model
+        sg_metric.model = inceptionv3_model
+        
+        is_metric.add_image_deep(result)
+        is_metric.add_image_mbb(img_mbb)
+        is_metric.add_image_seam(img_seam)
+
+        sg_metric.add_image_deep(result)
+        sg_metric.add_image_mbb(img_mbb)
+        sg_metric.add_image_seam(img_seam)
+
+        fid_metric.add_image_deep(img_merge, result)
+        fid_metric.add_image_mbb(img_merge, img_mbb)
+        fid_metric.add_image_seam(img_merge, img_seam)
+
+        lpips_metric.add_image_mbb(img_merge, result)
+        lpips_metric.add_image_deep(img_merge, img_mbb)
+        lpips_metric.add_image_seam(img_merge, img_seam)
         print(f"PNSR: {m_pnsr}, and SSIM: {m_ssim}, Output Dir: {outdir}")
 
 
@@ -279,4 +612,11 @@ if __name__ == "__main__":
 
     else:
         stitch(files, model_type=model_type, outdir=m_outdir, compare_result=args.compare_result, scale_factor=args.scale_factor)
+
+    if args.compare_result:
+        iss = is_metric.getvalues()
+        sgs = sg_metric.getvalues()
+        fid = fid_metric.getvalues()
+        lpips_distance = lpips_metric.getvalues()
+        print(f"iss: {iss}, sgs: {sgs}, fid: {fid}, lpips_distance: {lpips_distance}")
 

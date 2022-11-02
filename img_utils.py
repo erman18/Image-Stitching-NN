@@ -25,9 +25,9 @@ import constant as cfg
 hparams = {
            'content_weight': 1e-1, # 1e-5,
            'style_weight': 4e-9,
-           'simple_weight': 2e-1, # 4e-5, # 4e-9,
-           'gradient_weight': 4e+1, # 4e-1,
-           'tv_weight': 4e-6, # 4e-7,
+           'simple_weight': 2e+0, # 4e-5, # 4e-9,
+           'gradient_weight': 4e+2, # 4e-1,
+           'tv_weight': 4e-5, # 4e-7,
            'learning_rate': 0.001,
            'residual_filters': 128,
            'residual_layers': 5,
