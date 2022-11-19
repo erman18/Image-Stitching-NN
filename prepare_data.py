@@ -1,26 +1,20 @@
-from __future__ import print_function, division
+from __future__ import division, print_function
 
-import glob
 import json
 import os
-import sys
-import time
-
-import numpy as np
-
-# from cv2 import imwrite, imread
 import random
 
-from sklearn.utils import shuffle
+from concurrent.futures import ThreadPoolExecutor
 
-import img_utils
+import numpy as np
+from tqdm import tqdm
+
 import constant as cfg
+import img_utils
 
 # sys.path.append(cfg.pano_libs_dir)
 # import pylab as plt
 import panowrapper as pw
-from tqdm import tqdm
-from concurrent.futures import ThreadPoolExecutor, as_completed
 
 
 def dict_raise_on_duplicates(ordered_pairs):

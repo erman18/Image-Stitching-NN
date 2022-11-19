@@ -3,15 +3,11 @@ from __future__ import print_function, division
 import tensorflow as tf
 from tensorflow.keras.models import Model
 from tensorflow.keras.layers import (
-    Concatenate,
     Add,
     Average,
     Input,
-    Dense,
-    Flatten,
     BatchNormalization,
     Activation,
-    LeakyReLU,
 )
 from tensorflow.keras.layers import (
     Convolution2D,
@@ -25,7 +21,7 @@ from tensorflow.keras import backend as K
 import tensorflow.keras.callbacks as callbacks
 import tensorflow.keras.optimizers as optimizers
 
-from advanced import HistoryCheckpoint, non_local_block, TensorBoardBatch
+from advanced import HistoryCheckpoint, TensorBoardBatch
 
 # import img_utils
 from data_generator import read_img_dataset  # , DataGenerator, image_stitching_generator
@@ -35,7 +31,6 @@ import constant as cfg
 
 import numpy as np
 import os
-import glob
 import time
 import warnings
 
@@ -64,7 +59,6 @@ def PSNRLoss(y_true, y_pred):
     Thus we remove that component completely and only compute the remaining MSE component.
     """
     return -10.0 * K.log(K.mean(K.square(y_pred - y_true))) / K.log(10.0)
-    # return K.cast(-10. * K.log(K.mean(K.square(y_pred - y_true))) / K.log(10.), dtype='float32')
 
 
 def psnr(y_true, y_pred):
@@ -90,10 +84,6 @@ class BaseStitchingModel(object):
         self.model_name = model_name
         # self.scale_factor = 1.0
         self.weight_path = None
-
-        # self.type_scale_type = "norm"  # Default = "norm" = 1. / 255
-        # self.type_requires_divisible_shape = False
-        # self.type_true_upscaling = False
 
     def create_model(
         self, height=32, width=32, channels=3, nb_camera=5, load_weights=False
@@ -228,58 +218,6 @@ class BaseStitchingModel(object):
             filename = out_file
 
         print("Output Result File: %s" % filename)
-        # os.makedirs(out_dirname, exist_ok=True)
-        # path = os.path.splitext(os.path.basename(img_path))
-        # filename = os.path.join(out_dirname, path[0] + "_" + suffix + time.strftime("_%Y%m%d-%H%M%S") + path[1])
-
-        # Read image
-        # true_img = imread(img_path)
-        # h, w = true_img.shape[0], true_img.shape[1]
-        # if verbose: print("Old Size : ", true_img.shape)
-        #
-        # img_dim_1, img_dim_2 = 0, 0
-        #
-        # if mode == "patch" and self.type_true_upscaling:
-        #     # Overriding mode for True Upscaling models
-        #     mode = 'fast'
-        #     print("Patch mode does not work with True Upscaling models yet. Defaulting to mode='fast'")
-        #
-        # if mode == 'patch':
-        #     # Create patches
-        #     if self.type_requires_divisible_shape:
-        #         if patch_size % 4 != 0:
-        #             print("Deep Denoise requires patch size which is multiple of 4.\nSetting patch_size = 8.")
-        #             patch_size = 8
-        #
-        #     images = img_utils.make_patches(true_img, scale_factor, patch_size, verbose=verbose)
-        #
-        #     nb_images = images.shape[0]
-        #     img_dim_1, img_dim_2 = images.shape[1], images.shape[2]
-        #     print("Number of patches = %d, Patch Shape = (%d, %d)" % (nb_images, img_dim_2, img_dim_1))
-        # else:
-        #     # Use full image for super resolution
-        #     img_dim_1, img_dim_2 = self.__match_autoencoder_size(img_dim_1, img_dim_2, init_dim_1, init_dim_2,
-        #                                                          scale_factor)
-        #
-        #     images = resize(true_img, (img_dim_1, img_dim_2))
-        #     images = np.expand_dims(images, axis=0)
-        #     print("Image is reshaped to : (%d, %d, %d)" % (images.shape[1], images.shape[2], images.shape[3]))
-        #
-        # # Save intermediate bilinear scaled image is needed for comparison.
-        # intermediate_img = None
-        # if save_intermediate:
-        #     if verbose: print("Saving intermediate image.")
-        #     fn = path[0] + "_intermediate_" + path[1]
-        #     intermediate_img = resize(true_img, (init_dim_1 * scale_factor, init_dim_2 * scale_factor))
-        #     imwrite(fn, intermediate_img)
-
-        # print("Images shape: ", images.shape)
-        # # Transpose and Process images
-        # # if K.image_dim_ordering() == "th":
-        # #     img_conv = images.transpose((0, 3, 1, 2)).astype(np.float32) / 255.
-        # # else:
-        # #     img_conv = images.astype(np.float32) / 255.
-        # img_conv = images.transpose((0, 2, 1, 3)).astype(np.float32) / 255.
 
         img_conv, h, w = self.__read_conv_img(img_path, scale_factor)
         img_conv = img_conv.transpose((0, 2, 1, 3)).astype(np.float32) / 255.0
