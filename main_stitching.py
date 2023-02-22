@@ -98,18 +98,21 @@ def stitch(files, model_type, outdir, scale_factor, compare_result=True):
             f"=> Shape im_merge: {sandfall_block.shape}, shape of img_mbb: {img_mbb.shape}, shape of img_seam: {img_seam.shape}"
         )
 
-    if model_type == "ddis" or model_type == "unddis":
+    # Final image size
+    final_h, final_w = sandfall_block.shape[1], sandfall_block.shape[2]
+    # if model_type == "ddis" or model_type == "unddis" or model_type == "unetis":
+    if model_type in ["ddis", "unddis", "unetis"]:
         # Pad image with zeros to the nearest power of 2
-        h = nearest_mult_n(sandfall_block.shape[1]) - sandfall_block.shape[1]
-        w = nearest_mult_n(sandfall_block.shape[2]) - sandfall_block.shape[2]
+        h = nearest_mult_n(sandfall_block.shape[1], 16) - sandfall_block.shape[1]
+        w = nearest_mult_n(sandfall_block.shape[2], 16) - sandfall_block.shape[2]
         sandfall_block = np.pad(
             sandfall_block, ((0, 0), (0, h), (0, w), (0, 0)), mode="constant"
         )
-        if compare_result:
-            img_mbb = np.pad(img_mbb, ((0, h), (0, w), (0, 0)), mode="constant")
-            print(
-                f"=> New Shape im_merge: {sandfall_block.shape}, shape of img_mbb: {img_mbb.shape}"
-            )
+        # if compare_result:
+        #     img_mbb = np.pad(img_mbb, ((0, h), (0, w), (0, 0)), mode="constant")
+        #     print(
+        #         f"=> New Shape im_merge: {sandfall_block.shape}, shape of img_mbb: {img_mbb.shape}"
+        #     )
 
     start_time = time.time()
     result = model.simple_stitch(
@@ -119,6 +122,8 @@ def stitch(files, model_type, outdir, scale_factor, compare_result=True):
         suffix=model_type + str(suffix),
         return_image=True,
     )
+    # Crop the image to the original size
+    result = result[:final_h, :final_w, :]
     print("--- %s seconds ---" % (time.time() - start_time))
 
     if compare_result:
@@ -250,7 +255,7 @@ def nearest_power_2(x: int):
     return 1 << (x - 1).bit_length()
 
 
-def nearest_mult_n(m, n=4):
+def nearest_mult_n(m: int, n: int = 4):
     return m if m % n == 0 else ((m // n) + 1) * n
 
 
@@ -266,10 +271,11 @@ if not model_type in [
     "distilled_rnis",
     "unrnis",
     "unddis",
+    "unetis",
 ]:
     raise ValueError(
         'Model type must be either "is", "eis", "dis", '
-        '"ddis", "rnis" or "distilled_rnis", "unrnis"'
+        '"ddis", "rnis" or "distilled_rnis", "unrnis", "unddis", "unetis"'
     )
 
 panow = None
@@ -334,6 +340,8 @@ if __name__ == "__main__":
         model = SSL_models.ResNetStitch(metric=args.metric)
     elif model_type == "unddis":  # Work
         model = SSL_models.DeepDenoiseStitch(metric=args.metric)
+    elif model_type == "unetis":  # Work
+        model = SSL_models.U_NetStitch(metric=args.metric)
     elif model_type == "distilled_rnis":  # Not Trained Yet
         # model = model_stitching.DistilledResNetStitch()
         print("The Distilled model has not been trained yet.")

@@ -10,8 +10,11 @@ from tensorflow.keras.layers import (
     Activation,
     Add,
     BatchNormalization,
+    Concatenate,
     Convolution2D,
+    Dropout,
     Input,
+    # InstanceNormalization,
     LeakyReLU,
     MaxPooling2D,
     UpSampling2D,
@@ -19,7 +22,6 @@ from tensorflow.keras.layers import (
 from tensorflow.keras.models import Model
 
 import constant as cfg
-
 
 gpus = tf.config.experimental.list_physical_devices("GPU")
 for gpu in gpus:
@@ -332,6 +334,104 @@ class DeepDenoiseStitch(BaseStitchingModel):
         )(m2)
 
         model = Model(init, decoded)
+        model.summary()
+
+        if load_weights and os.path.exists(self.weight_path):
+            print(f"Loading model weights at {self.weight_path}...")
+            model.load_weights(self.weight_path, by_name=True)
+        elif load_weights:
+            cfg.PRINT_WARNING(
+                f"Cannot load the file {self.weight_path}, it doesn't exist!"
+            )
+
+        self.model = model
+        return model
+
+
+class U_NetStitch(BaseStitchingModel):
+    def __init__(self, metric=None):
+        super(U_NetStitch, self).__init__("U_NetStitch")
+
+        # Treat this model as a denoising auto encoder
+        # Force the fit, evaluate and upscale methods to take special care about image shape
+
+        self.nb_filters = 64
+
+        self.weight_path = "weights/U_NetStitch.h5"
+        if metric and len(metric.strip()):
+            self.weight_path = self.weight_path.replace(".h5", f"_{metric}.h5")
+
+        self.activation = "tanh"  # The activation function of the last layer of the model
+
+    def create_model(
+        self, height=32, width=32, channels=3, nb_camera=5, load_weights=False
+    ):
+        # U-Net model Down sampling
+        def down_sampling(
+            x, filters, kernel_size=(4, 4), padding="same", strides=2, name=""
+        ):
+            d = Convolution2D(
+                filters, kernel_size, padding=padding, strides=strides, name=name
+            )(x)
+            d = BatchNormalization()(d)
+            # d = InstanceNormalization(axis=-1, center=False, scale=False)(d)
+            d = Activation("relu")(d)
+            return d
+
+        # U-Net model Up sampling
+        def up_sampling(
+            x,
+            skip,
+            filters,
+            kernel_size=(4, 4),
+            padding="same",
+            strides=1,
+            dropout_rate=0,
+            name="",
+        ):
+            c = UpSampling2D(size=2)(x)
+            c = Convolution2D(
+                filters, kernel_size, padding=padding, strides=strides, name=name
+            )(c)
+            c = BatchNormalization()(c)
+            # c = InstanceNormalization(axis=-1, center=False, scale=False)(c)
+            c = Activation("relu")(c)
+            if dropout_rate:
+                c = Dropout(dropout_rate)(c)
+            c = Concatenate()([c, skip])
+            return c
+
+        # Input layer of the model
+        init = super(U_NetStitch, self).create_model(
+            height=height,
+            width=width,
+            channels=channels,
+            nb_camera=nb_camera,
+            load_weights=load_weights,
+        )
+
+        # U-Net model Down sampling
+        d1 = down_sampling(init, self.nb_filters)
+        d2 = down_sampling(d1, self.nb_filters * 2)
+        d3 = down_sampling(d2, self.nb_filters * 4)
+        d4 = down_sampling(d3, self.nb_filters * 8)
+
+        # U-Net model Up sampling
+        u1 = up_sampling(d4, d3, self.nb_filters * 4)
+        u2 = up_sampling(u1, d2, self.nb_filters * 2)
+        u3 = up_sampling(u2, d1, self.nb_filters)
+        u4 = UpSampling2D(size=2)(u3)
+
+        decoded = Convolution2D(
+            channels,
+            kernel_size=4,
+            strides=1,
+            activation=self.activation,
+            padding="same",
+            name="conv_final",
+        )(u4)
+
+        model = Model(init, decoded, name="U_NetStitch")
         model.summary()
 
         if load_weights and os.path.exists(self.weight_path):

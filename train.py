@@ -1,20 +1,32 @@
-from __future__ import print_function, division
+from __future__ import division, print_function
 
 import argparse
+import random
+import time
 
+import numpy as np
+import tensorflow as tf
+import tensorflow.keras.callbacks as callbacks
+from sklearn.model_selection import train_test_split
 from tensorflow.keras.utils import plot_model
-import constant as cfg
 
+import constant as cfg
+import img_utils
+import prepare_data as psd
+from advanced import HistoryCheckpoint, TensorBoardBatch
+from data_generator import read_img_dataset
+from loss import ISMetric, LPIPSMetric, PNSRMetric, SSIMMetric
 from model_stitching import DeepDenoiseStitch as DDStitch
-from model_stitching import DistilledResNetStitch as DResStitch
-from model_stitching import ResNetStitch as ResNetStitch
-from model_stitching import ImageStitchingModel as DPImgStitch
-from model_stitching import ExpantionStitching as ExpStitch
 from model_stitching import DenoisingAutoEncoderStitch as DAutoEncoderStitch
-from SSL_models import ResNetStitch as UnResNetStitch
+from model_stitching import DistilledResNetStitch as DResStitch
+from model_stitching import ExpantionStitching as ExpStitch
+from model_stitching import ImageStitchingModel as DPImgStitch
+from model_stitching import ResNetStitch as ResNetStitch
 from SSL_models import DeepDenoiseStitch as UnDDStitch
+from SSL_models import ResNetStitch as UnResNetStitch
 from SSL_models import VGGLossNetwork
-from loss import PNSRMetric, SSIMMetric, ISMetric, LPIPSMetric
+from SSL_models import U_NetStitch
+from un_data_generator import un_read_img_dataset
 
 model_directory = {
     "DDStitch": DDStitch,
@@ -25,6 +37,7 @@ model_directory = {
     "DAutoEncoderStitch": DAutoEncoderStitch,
     "UnResNetStitch": UnResNetStitch,
     "UnDDStitch": UnDDStitch,
+    "U_NetStitch": U_NetStitch,
 }
 
 parser = argparse.ArgumentParser()
@@ -62,39 +75,6 @@ args = parser.parse_args()
 print("==> Training Argument: ", args)
 net = model_directory[args.model]
 model_name = args.model
-
-
-# def train(height, width, nb_epochs=10, batch_size=32, save_arch=False, load_weights=True):
-#     # stitch_model = model_stitching.NonLocalResNetStitching()
-#     stitch_model = net()  # model_stitching.DeepDenoiseStitch()
-#     stitch_model.create_model(height=height, width=width, load_weights=load_weights)
-
-#     if save_arch:
-#         plot_model(stitch_model.model, to_file=f"architectures/model_img/{model_name}.png", show_shapes=True,
-#                    show_layer_names=True)
-
-
-#     stitch_model.fit(nb_epochs=nb_epochs, batch_size=batch_size)
-
-
-import time
-import random
-import numpy as np
-import tensorflow as tf
-from tensorflow.keras import backend as K
-import tensorflow.keras.callbacks as callbacks
-
-# import tensorflow.keras.optimizers as optimizers
-from advanced import HistoryCheckpoint, TensorBoardBatch
-
-# from tensorflow.keras.models import Model
-# from tensorflow.python.framework.ops import disable_eager_execution
-# disable_eager_execution()
-from data_generator import read_img_dataset
-from un_data_generator import un_read_img_dataset
-import prepare_data as psd
-from sklearn.model_selection import train_test_split
-import img_utils
 
 model = None
 # from tensorflow.keras import mixed_precision
@@ -172,7 +152,7 @@ def train(height, width, nb_epochs=10, batch_size=32, save_arch=False, load_weig
     callback_list.append(
         callbacks.ModelCheckpoint(
             stitch_model.weight_path,
-            monitor="loss",
+            monitor="val_LPIPSMetric",  # "loss",
             save_best_only=True,
             mode="min",
             save_weights_only=True,
@@ -479,7 +459,7 @@ def un_train(
     callback_list.append(
         callbacks.ModelCheckpoint(
             stitch_model.weight_path,
-            monitor="loss",
+            monitor="val_LPIPSMetric",  # "loss",
             save_best_only=True,
             mode="min",
             save_weights_only=True,
@@ -720,7 +700,7 @@ def un_train(
 
     print("\nTotal Time Training: %.2fs" % (time.time() - total_time))
     all_callbacks.on_train_end(logs=logs)
-    img_utils.delete_dataset_indexes(file_index_pref)
+    # img_utils.delete_dataset_indexes(file_index_pref)
 
 
 def save_model_plots():

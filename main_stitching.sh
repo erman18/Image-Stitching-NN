@@ -78,17 +78,17 @@ DFS="MCMI"
 # DFS="SCMI"
 # SCALE_FACTOR=2
 
-# Data Test 9
-IMGDIR=/mnt/data/enghonda/deepstitch-dataset/raw_data/example-data/Campus/CMU1
-OUTDIR=/mnt/data/enghonda/deepstitch-dataset/cvpr_result/CMU1/4
-DFS="IDIR"
-SCALE_FACTOR=2
-
-# # Data Test 10
-# IMGDIR=/mnt/data/enghonda/deepstitch-dataset/raw_data/UFCampus/UFWEST4
-# OUTDIR=/mnt/data/enghonda/deepstitch-dataset/cvpr_result/UFWEST4/4
+# # Data Test 9
+# IMGDIR=/mnt/data/enghonda/deepstitch-dataset/raw_data/example-data/Campus/CMU1
+# OUTDIR=/mnt/data/enghonda/deepstitch-dataset/cvpr_result/CMU1/4
 # DFS="IDIR"
-# SCALE_FACTOR=3
+# SCALE_FACTOR=2
+
+# Data Test 10
+IMGDIR=/mnt/data/enghonda/deepstitch-dataset/raw_data/UFCampus/UFWEST4
+OUTDIR=/mnt/data/enghonda/deepstitch-dataset/cvpr_result/UFWEST4/4
+DFS="IDIR"
+SCALE_FACTOR=3
 
 # # Data Test 11
 # IMGDIR=/mnt/data/enghonda/deepstitch-dataset/raw_data/example-data/zijing
@@ -132,9 +132,9 @@ SCALE_FACTOR=2
 # DFS="IDIR"
 # SCALE_FACTOR=1
 
-# METRIC=latest_best # lpips
+METRIC=lpips
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$LIB_DIR/pano &&
 # Model: is, eis, dis, ddis, rnis, distilled_rnis (not yet trained)
-# New model: unrnis, unddis
-python main_stitching.py --imgdir $IMGDIR --outdir $OUTDIR --model unrnis --calib_pattern $CALIB_PATTERN --input_pattern $INPUT_PATTERN \
+# New model: unrnis, unddis, unetis
+python main_stitching.py --imgdir $IMGDIR --outdir $OUTDIR --model unetis --calib_pattern $CALIB_PATTERN --input_pattern $INPUT_PATTERN \
     -nbc $NBC -nbi $NBI -nbis $NBIS --scale_factor=$SCALE_FACTOR --dfs=$DFS --files=$FILES --metric=$METRIC
